@@ -321,6 +321,22 @@ def count_lines(path: Path) -> int:
     return n
 
 
+def detect_separator(first_line: str, sample: str) -> str | None:
+    """Séparateur le plus fréquent dans l'en-tête ; csv.Sniffer seulement en dernier recours.
+
+    Sniffer se trompe sur les fichiers du ministère (lignes de longueur variable,
+    décimales à virgule), d'où la priorité donnée à l'en-tête.
+    """
+    counts = {s: first_line.count(s) for s in CANDIDATE_SEPARATORS}
+    best = max(counts, key=counts.get)
+    if counts[best] > 0:
+        return best
+    try:
+        return csv.Sniffer().sniff(sample, delimiters=CANDIDATE_SEPARATORS).delimiter
+    except csv.Error:
+        return None
+
+
 def inspect_text(path: Path) -> TextInfo:
     """Encodage, séparateur, nb de lignes et en-tête. Ne lève jamais d'exception."""
     try:
@@ -328,19 +344,15 @@ def inspect_text(path: Path) -> TextInfo:
         n_lines = count_lines(path)
         with path.open("r", encoding=encoding, newline="") as f:
             sample = f.read(64 * 1024)
-        try:
-            separator: str | None = csv.Sniffer().sniff(sample, delimiters=CANDIDATE_SEPARATORS).delimiter
-        except csv.Error:
-            first = sample.splitlines()[0] if sample else ""
-            counts = {s: first.count(s) for s in CANDIDATE_SEPARATORS}
-            best = max(counts, key=counts.get)
-            separator = best if counts[best] > 0 else None
         first_line = sample.splitlines()[0] if sample else ""
+        separator = detect_separator(first_line, sample)
         header = next(csv.reader([first_line], delimiter=separator)) if separator else [first_line]
         header = [h.strip() for h in header]
         info = TextInfo(encoding, separator, n_lines, len(header), header[:50])
         if n_lines < 2 or not any(header):
             info.error = "en-tête vide ou moins de 2 lignes"
+        elif len(header) < 2:
+            info.error = "une seule colonne détectée : séparateur probablement erroné"
         return info
     except Exception as exc:  # noqa: BLE001 : on veut un diagnostic, pas un plantage
         return TextInfo("inconnu", None, 0, None, [], error=f"{type(exc).__name__}: {exc}")
@@ -368,29 +380,60 @@ def _progress(done: int, total: int | None, name: str) -> None:
     sys.stderr.flush()
 
 
-def download(url: str, dest: Path, session: requests.Session, name: str) -> None:
-    """Téléchargement en streaming vers un .part, renommé à la fin (atomique)."""
+def check_zip(path: Path) -> None:
+    """Lève OSError si l'archive est tronquée ou corrompue."""
+    try:
+        with zipfile.ZipFile(path) as zf:
+            bad = zf.testzip()
+    except zipfile.BadZipFile as exc:
+        raise OSError(f"archive zip invalide : {exc}") from exc
+    if bad is not None:
+        raise OSError(f"archive zip corrompue (membre {bad})")
+
+
+def download(url: str, dest: Path, session: requests.Session, name: str, is_zip: bool = False) -> None:
+    """Téléchargement en streaming vers un .part, renommé à la fin (atomique).
+
+    Après une coupure, reprend où il s'était arrêté (en-tête Range) si le serveur
+    l'accepte. Un zip n'est renommé qu'après vérification de son intégrité.
+    """
     tmp = dest.with_name(dest.name + ".part")
+    tmp.unlink(missing_ok=True)
     for attempt in range(1, MAX_RETRIES + 1):
         try:
-            with session.get(url, stream=True, timeout=TIMEOUT) as r:
+            done = tmp.stat().st_size if tmp.exists() else 0
+            headers = {"Range": f"bytes={done}-"} if done else {}
+            with session.get(url, stream=True, timeout=TIMEOUT, headers=headers) as r:
                 r.raise_for_status()
-                total = int(r.headers.get("content-length") or 0) or None
-                done = 0
-                with tmp.open("wb") as f:
+                if done and r.status_code != 206:
+                    log.info("%s : reprise refusée par le serveur, téléchargement depuis le début", name)
+                    done = 0
+                length = int(r.headers.get("content-length") or 0) or None
+                total = done + length if length is not None else None
+                if done:
+                    log.info("%s : reprise à %.1f Mo", name, done / 1e6)
+                with tmp.open("ab" if done else "wb") as f:
                     for chunk in r.iter_content(CHUNK_SIZE):
                         f.write(chunk)
                         done += len(chunk)
                         _progress(done, total, name)
                 if sys.stderr.isatty():
                     sys.stderr.write("\n")
-                if total is not None and done != total:
-                    raise OSError(f"taille reçue {done} != content-length {total}")
+                if total is None:
+                    log.warning("%s : pas de Content-Length, impossible de vérifier la complétude", name)
+                elif done != total:
+                    raise OSError(f"taille reçue {done} != attendue {total}")
+            if is_zip:
+                try:
+                    check_zip(tmp)
+                except OSError:
+                    tmp.unlink(missing_ok=True)  # inutilisable : on repartira de zéro
+                    raise
             os.replace(tmp, dest)
             return
         except (requests.RequestException, OSError) as exc:
-            tmp.unlink(missing_ok=True)
             if attempt == MAX_RETRIES:
+                tmp.unlink(missing_ok=True)
                 raise
             wait = 2**attempt
             log.warning("%s : tentative %d/%d échouée (%s), nouvel essai dans %ds",
@@ -448,17 +491,24 @@ def describe_file(path: Path, fmt: str) -> dict[str, Any]:
 
 
 def is_valid(name: str, src: dict[str, str], manifest: dict[str, Any]) -> bool:
-    """Présent, non vide, et taille identique au manifeste s'il en existe une entrée."""
+    """Présent, non vide, enregistré au manifeste avec la même URL et la même taille.
+
+    Pour un zip, le dossier d'extraction doit en plus exister et être non vide.
+    """
     dest = RAW_DIR / src["filename"]
     if not dest.is_file() or dest.stat().st_size == 0:
         return False
-    previous = manifest.get(name, {})
-    if previous.get("url") not in (None, src["url"]):
+    previous = manifest.get(name)
+    if previous is None:
+        return False  # téléchargement jamais terminé avec succès
+    if previous.get("url") != src["url"]:
         return False  # l'URL a changé depuis le dernier téléchargement
-    if "size_bytes" in previous and previous["size_bytes"] != dest.stat().st_size:
+    if previous.get("size_bytes") != dest.stat().st_size:
         return False
-    if src["format"] == "zip" and not (RAW_DIR / name).is_dir():
-        return False
+    if src["format"] == "zip":
+        extract_dir = RAW_DIR / name
+        if not extract_dir.is_dir() or not any(extract_dir.iterdir()):
+            return False
     return True
 
 
@@ -470,7 +520,7 @@ def process(name: str, src: dict[str, str], session: requests.Session,
         return False
 
     log.info("%s : téléchargement de %s", name, src["url"])
-    download(src["url"], dest, session, name)
+    download(src["url"], dest, session, name, is_zip=src["format"] == "zip")
     if dest.stat().st_size == 0:
         raise ValueError(f"{name} : fichier téléchargé vide")
 
@@ -536,6 +586,9 @@ def main(argv: list[str] | None = None) -> int:
     failures: list[str] = []
     with requests.Session() as session:
         session.headers["User-Agent"] = USER_AGENT
+        # Sans cela, certains serveurs (INSEE Melodi) recompressent à la volée, en
+        # chunked sans Content-Length : transfert lent et troncature indétectable.
+        session.headers["Accept-Encoding"] = "identity"
         for i, name in enumerate(names):
             try:
                 downloaded = process(name, SOURCES[name], session, manifest, args.force)
