@@ -1,0 +1,95 @@
+{
+  "insee_filosofi_2023": {
+    "downloaded_at": "2026-10-06T13:05:15+00:00",
+    "extracted": [
+      {
+        "encoding": "utf-8",
+        "header": [
+          "GEO",
+          "GEO_OBJECT",
+          "FILOSOFI_MEASURE",
+          "UNIT_MEASURE",
+          "UNIT_MULT",
+          "CONF_STATUS",
+          "OBS_STATUS",
+          "TIME_PERIOD",
+          "OBS_VALUE"
+        ],
+        "n_columns": 9,
+        "n_lines": 1123174,
+        "path": "data/raw/insee_filosofi_2023/DS_FILOSOFI_CC_2023_data.csv",
+        "separator": ";",
+        "sha256": "19d9ba9d049e4525ab18263c2deb5e6fce73a1f2f13ff45baed795e45e14f341",
+        "size_bytes": 57830279
+      },
+      {
+        "encoding": "utf-8",
+        "header": [
+          "COD_VAR",
+          "LIB_VAR",
+          "COD_MOD",
+          "LIB_MOD",
+          "GEO_OBJECT"
+        ],
+        "n_columns": 5,
+        "n_lines": 41648,
+        "path": "data/raw/insee_filosofi_2023/DS_FILOSOFI_CC_2023_metadata.csv",
+        "separator": ";",
+        "sha256": "f26f5ef5a11aed5c12ccfe16744bb059fbdebf7370b59c4fbac7a39e5f9bfd71",
+        "size_bytes": 2104917
+      }
+    ],
+    "format": "zip",
+    "path": "data/raw/insee_filosofi_2023.zip",
+    "producer": "INSEE",
+    "sha256": "cc2cb14103f522175284120aa2342b8dd27a377fe3318abea77339d258f3b95d",
+    "size_bytes": 5352911,
+    "source": "insee_filosofi_2023",
+    "url": "https://api.insee.fr/melodi/file/DS_FILOSOFI_CC/DS_FILOSOFI_CC_2023_CSV_FR"
+  },
+  "muni2014_t2_1000plus": {
+    "downloaded_at": "2026-10-06T13:05:05+00:00",
+    "encoding": "cp1252",
+    "format": "txt",
+    "header": [
+      "Date de l'export",
+      "Code du département",
+      "Type de scrutin",
+      "Libellé du département",
+      "Code de la commune",
+      "Libellé de la commune",
+      "Inscrits",
+      "Abstentions",
+      "% Abs/Ins",
+      "Votants",
+      "% Vot/Ins",
+      "Blancs et nuls",
+      "% BlNuls/Ins",
+      "% BlNuls/Vot",
+      "Exprimés",
+      "% Exp/Ins",
+      "% Exp/Vot",
+      "Code Nuance",
+      "Sexe",
+      "Nom",
+      "Prénom",
+      "Liste",
+      "Sièges / Elu",
+      "Sièges Secteur",
+      "Sièges CC",
+      "Voix",
+      "% Voix/Ins",
+      "% Voix/Exp",
+      ""
+    ],
+    "n_columns": 29,
+    "n_lines": 1801,
+    "path": "data/raw/muni2014_t2_1000plus.txt",
+    "producer": "Ministère de l'Intérieur",
+    "separator": ";",
+    "sha256": "24614c40f77f49e65a4aa2b3046ef9d53c79ed6d92540b0a255b4111fda0cc69",
+    "size_bytes": 664065,
+    "source": "muni2014_t2_1000plus",
+    "url": "https://www.data.gouv.fr/storage/f/2014-03-31T09-49-28/muni-2014-resultats-com-1000-et-plus-t2.txt"
+  }
+}

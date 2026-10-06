@@ -1,0 +1,6 @@
+requests
+pandas
+xlrd
+openpyxl
+pyarrow
+geopandas
