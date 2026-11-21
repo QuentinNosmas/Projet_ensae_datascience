@@ -56,7 +56,7 @@ MI = "Ministère de l'Intérieur"
 DGF = "https://static.data.gouv.fr/resources"
 
 # --------------------------------------------------------------------------
-# Sources. format : csv | txt | xls | zip | geojson.gz
+# Sources. format : csv | txt | xls | zip | geojson.gz | json
 # --------------------------------------------------------------------------
 SOURCES: dict[str, dict[str, str]] = {
     # 1. Résultats des municipales par commune --------------------------------
@@ -263,6 +263,35 @@ SOURCES: dict[str, dict[str, str]] = {
         "filename": "pres2022_t2_communes.txt",
         "format": "txt",
         "producer": MI,
+    },
+    # 8. Affaires judiciaires des personnalités politiques -----------------------
+    # Pas d'open data officiel nominatif. Deux bases citoyennes, mises à jour en
+    # continu (le manifeste garde la date et l'empreinte du fichier utilisé) :
+    # - Casier Politique : condamnations extraites de Wikipédia / Wikidata, avec
+    #   les mandats de chaque personnalité. Licence CC BY-NC-SA 4.0.
+    #   Méthodologie : https://casier-politique.fr/about
+    "casier_politique_affaires": {
+        "url": "https://casier-politique.fr/data/affaires.json",
+        "filename": "casier_politique_affaires.json",
+        "format": "json",
+        "producer": "Casier Politique (R. Jolivet), CC BY-NC-SA 4.0",
+    },
+    # - Poligraph : affaires sourcées (presse, décisions), y compris non jugées
+    #   (enquête, mise en examen) et relaxes, avec date des faits / de début /
+    #   du verdict. Code AGPL-3.0 (github.com/ironlam/poligraph). API publique
+    #   limitée à 5 requêtes par minute.
+    "poligraph_affaires": {
+        "url": "https://poligraph.fr/api/export/affaires?limit=50000",
+        "filename": "poligraph_affaires.csv",
+        "format": "csv",
+        "producer": "Poligraph (LD Engineering)",
+    },
+    # Personnalités ayant au moins une affaire, avec leur Q-ID Wikidata.
+    "poligraph_politiques": {
+        "url": "https://poligraph.fr/api/export/politiques?hasAffairs=true&activeOnly=false",
+        "filename": "poligraph_politiques.csv",
+        "format": "csv",
+        "producer": "Poligraph (LD Engineering)",
     },
 }
 
