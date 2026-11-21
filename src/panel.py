@@ -363,16 +363,20 @@ def build_panel() -> pd.DataFrame:
     listes = {a: resultats_listes(a) for a in (2014, 2020, 2026)}
     p20 = panel_election(2020, 2014, sortants_2020(listes[2014]), listes[2020], listes[2014])
     p26 = panel_election(2026, 2020, sortants_2026(), listes[2026], listes[2020])
-    p26["reelu_maire"] = reelus_2026(p26)
-    p20["reelu_maire"] = pd.NA  # pas de RNE de 2020 disponible
+    p26["reelu_maire"] = pd.array(reelus_2026(p26), dtype="boolean")
+    p20["reelu_maire"] = pd.array([pd.NA] * len(p20), dtype="boolean")  # pas de RNE de 2020
+    # Colonnes vides en 2020 (sexe, date de naissance... du sortant, inconnus) :
+    # on leur donne le type de 2026 pour que la concaténation garde ce type.
+    for c in p20.columns[p20.isna().all()]:
+        if c in p26:
+            p20[c] = p20[c].astype(p26[c].dtype)
     panel = pd.concat([p20, p26], ignore_index=True)
-    panel["reelu_maire"] = panel["reelu_maire"].astype("boolean")
     for c in ("sortant_candidat", "sortant_tete_liste", "liste_sortant_gagnante", "tete_liste_prec",
               "perimetre_modifie", "second_tour"):
         panel[c] = panel[c].astype("boolean")
     for c in ("num_panneau", "nuance", "bloc", "num_panneau_prec", "nuance_prec", "bloc_prec"):
         panel[c] = panel[c].astype("string")
-    for c in ("sieges_cm", "sieges_cm_prec"):
+    for c in ("sieges_cm", "sieges_cm_prec", "n_listes", "n_listes_prec"):
         panel[c] = pd.to_numeric(panel[c], errors="coerce").astype("Int64")
     return panel
 
