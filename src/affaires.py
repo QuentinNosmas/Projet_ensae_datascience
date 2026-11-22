@@ -274,7 +274,7 @@ def variables_traitement(aff_sortants: pd.DataFrame) -> pd.DataFrame:
 
 
 def build() -> tuple[pd.DataFrame, pd.DataFrame]:
-    panel = P.read_processed("panel_sortants")
+    panel = P.load_panel()
     pers, aff = toutes_affaires()
     couples = apparier_sortants(panel, pers)
     ok = couples[couples["confirme"]]

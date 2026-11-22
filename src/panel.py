@@ -394,12 +394,24 @@ def resume(panel: pd.DataFrame) -> pd.DataFrame:
     ).round(3)
 
 
+PANEL_PATH = PROCESSED_DIR / "panel_sortants.parquet"
+
+
+def write_panel() -> pd.DataFrame:
+    panel = build_panel()
+    panel.to_parquet(PANEL_PATH, index=False)
+    log.info("panel : %d lignes x %d colonnes -> %s", len(panel), panel.shape[1], PANEL_PATH.relative_to(ROOT))
+    return panel
+
+
+def load_panel() -> pd.DataFrame:
+    """Le panel enregistré, construit (et enregistré) s'il n'existe pas encore."""
+    return pd.read_parquet(PANEL_PATH) if PANEL_PATH.exists() else write_panel()
+
+
 def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)-7s %(message)s", datefmt="%H:%M:%S")
-    panel = build_panel()
-    out = PROCESSED_DIR / "panel_sortants.parquet"
-    panel.to_parquet(out, index=False)
-    log.info("panel : %d lignes x %d colonnes -> %s", len(panel), panel.shape[1], out.relative_to(ROOT))
+    panel = write_panel()
     log.info("résumé :\n%s", resume(panel).to_string())
     return 0
 
