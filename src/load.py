@@ -78,10 +78,23 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df.set_axis(cols, axis=1)
 
 
+def ensure_raw(source: str) -> None:
+    """Télécharge la source brute si elle manque (clone neuf du dépôt : data/raw est vide)."""
+    manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8")) if MANIFEST_PATH.exists() else {}
+    entry = manifest.get(source)
+    if entry is not None and (ROOT / entry["path"]).is_file():
+        return
+    log.info("%s : fichier brut absent, téléchargement", source)
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import download_data  # noqa: PLC0415 (import tardif : inutile si les données sont là)
+
+    if download_data.main(["--only", source]) != 0:
+        raise RuntimeError(f"{source} : échec du téléchargement (voir scripts/download_data.py)")
+
+
 def manifest_entry(source: str, member: str | None = None) -> dict:
+    ensure_raw(source)
     manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
-    if source not in manifest:
-        raise KeyError(f"{source} absent de MANIFEST.json : lancer scripts/download_data.py --only {source}")
     entry = manifest[source]
     if member is None:
         return entry
