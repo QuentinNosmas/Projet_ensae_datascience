@@ -92,14 +92,14 @@
     "url": "https://www.insee.fr/fr/statistiques/fichier/8740222/v_mvt_commune_2026.csv"
   },
   "contours_communes_2025_50m": {
-    "downloaded_at": "2026-10-06T13:22:03+00:00",
+    "downloaded_at": "2026-11-22T17:48:36+00:00",
     "format": "geojson.gz",
     "path": "data/raw/contours_communes_2025_50m.geojson.gz",
     "producer": "data.gouv.fr (Etalab), ODbL",
     "sha256": "e311c36d55a50e5aaacbd9f7cf3707a4a00c5f24cd2a7fa43aba0f1cfdbb43bc",
     "size_bytes": 17577173,
     "source": "contours_communes_2025_50m",
-    "url": "https://object.data.gouv.fr/contours-administratifs/2025/geojson/communes-50m.geojson.gz"
+    "url": "https://contours-administratifs.s3.rbx.io.cloud.ovh.net/2025/geojson/communes-50m.geojson.gz"
   },
   "insee_diplomes_rp2023": {
     "downloaded_at": "2026-10-06T13:26:21+00:00",

@@ -40,6 +40,9 @@ import requests
 ROOT = Path(__file__).resolve().parent.parent
 RAW_DIR = ROOT / "data" / "raw"
 MANIFEST_PATH = ROOT / "data" / "MANIFEST.json"
+# Instantanés versionnés des sources mises à jour en continu (bases d'affaires) :
+# sans eux, les résultats changeraient d'un jour à l'autre. --live les ignore.
+SNAPSHOT_DIR = ROOT / "data" / "snapshots"
 
 USER_AGENT = "Projet-ENSAE-probite-maires/1.0 (projet etudiant ENSAE; python-requests)"
 TIMEOUT = (15, 120)  # (connexion, lecture) en secondes
@@ -214,7 +217,7 @@ SOURCES: dict[str, dict[str, str]] = {
     # Alternative : « Contours administratifs », data.gouv.fr (Etalab), licence ODbL,
     # millésime 2025, simplification 50 m. Conservé compressé (.gz).
     "contours_communes_2025_50m": {
-        "url": "https://object.data.gouv.fr/contours-administratifs/2025/geojson/communes-50m.geojson.gz",
+        "url": "https://contours-administratifs.s3.rbx.io.cloud.ovh.net/2025/geojson/communes-50m.geojson.gz",
         "filename": "contours_communes_2025_50m.geojson.gz",
         "format": "geojson.gz",
         "producer": "data.gouv.fr (Etalab), ODbL",
@@ -267,12 +270,15 @@ SOURCES: dict[str, dict[str, str]] = {
     # 8. Affaires judiciaires des personnalités politiques -----------------------
     # Pas d'open data officiel nominatif. Deux bases citoyennes, mises à jour en
     # continu (le manifeste garde la date et l'empreinte du fichier utilisé) :
+    # Ces bases évoluent chaque jour : par défaut on utilise l'instantané du
+    # 21/11/2026 versionné dans data/snapshots/ (option --live : version en ligne).
     # - Casier Politique : condamnations extraites de Wikipédia / Wikidata, avec
     #   les mandats de chaque personnalité. Licence CC BY-NC-SA 4.0.
     #   Méthodologie : https://casier-politique.fr/about
     "casier_politique_affaires": {
         "url": "https://casier-politique.fr/data/affaires.json",
         "filename": "casier_politique_affaires.json",
+        "snapshot": "casier_politique_affaires.json",
         "format": "json",
         "producer": "Casier Politique (R. Jolivet), CC BY-NC-SA 4.0",
     },
@@ -283,6 +289,7 @@ SOURCES: dict[str, dict[str, str]] = {
     "poligraph_affaires": {
         "url": "https://poligraph.fr/api/export/affaires?limit=50000",
         "filename": "poligraph_affaires.csv",
+        "snapshot": "poligraph_affaires.csv",
         "format": "csv",
         "producer": "Poligraph (LD Engineering)",
     },
@@ -290,6 +297,7 @@ SOURCES: dict[str, dict[str, str]] = {
     "poligraph_politiques": {
         "url": "https://poligraph.fr/api/export/politiques?hasAffairs=true&activeOnly=false",
         "filename": "poligraph_politiques.csv",
+        "snapshot": "poligraph_politiques.csv",
         "format": "csv",
         "producer": "Poligraph (LD Engineering)",
     },
@@ -542,14 +550,20 @@ def is_valid(name: str, src: dict[str, str], manifest: dict[str, Any]) -> bool:
 
 
 def process(name: str, src: dict[str, str], session: requests.Session,
-            manifest: dict[str, Any], force: bool) -> bool:
+            manifest: dict[str, Any], force: bool, live: bool = False) -> bool:
     dest = RAW_DIR / src["filename"]
-    if not force and is_valid(name, src, manifest):
+    snapshot = SNAPSHOT_DIR / src["snapshot"] if "snapshot" in src and not live else None
+    if not force and is_valid(name, src, manifest) and \
+            (snapshot is None or sha256sum(dest) == sha256sum(snapshot)):
         log.info("%s : déjà présent et valide, ignoré (--force pour retélécharger)", name)
         return False
 
-    log.info("%s : téléchargement de %s", name, src["url"])
-    download(src["url"], dest, session, name, is_zip=src["format"] == "zip")
+    if snapshot is not None:
+        log.info("%s : copie de l'instantané %s", name, snapshot.relative_to(ROOT))
+        shutil.copyfile(snapshot, dest)
+    else:
+        log.info("%s : téléchargement de %s", name, src["url"])
+        download(src["url"], dest, session, name, is_zip=src["format"] == "zip")
     if dest.stat().st_size == 0:
         raise ValueError(f"{name} : fichier téléchargé vide")
 
@@ -559,6 +573,7 @@ def process(name: str, src: dict[str, str], session: requests.Session,
         "url": src["url"],
         "format": src["format"],
         "downloaded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        **({"snapshot": snapshot.relative_to(ROOT).as_posix()} if snapshot is not None else {}),
         **describe_file(dest, src["format"]),
     }
     if src["format"] == "zip":
@@ -581,6 +596,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument("--only", nargs="+", metavar="NOM", help="ne traiter que ces sources")
     p.add_argument("--list", action="store_true", help="lister les sources et quitter")
     p.add_argument("--force", action="store_true", help="retélécharger même si déjà présent")
+    p.add_argument("--live", action="store_true",
+                   help="sources à instantané : télécharger la version en ligne du jour")
     p.add_argument("-v", "--verbose", action="store_true")
     return p.parse_args(argv)
 
@@ -620,7 +637,7 @@ def main(argv: list[str] | None = None) -> int:
         session.headers["Accept-Encoding"] = "identity"
         for i, name in enumerate(names):
             try:
-                downloaded = process(name, SOURCES[name], session, manifest, args.force)
+                downloaded = process(name, SOURCES[name], session, manifest, args.force, args.live)
             except Exception as exc:  # noqa: BLE001 : on continue avec les autres sources
                 log.error("%s : ÉCHEC : %s", name, exc)
                 failures.append(name)
