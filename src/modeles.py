@@ -25,6 +25,7 @@ from sklearn.preprocessing import StandardScaler
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import affaires as A  # noqa: E402
+import analyse as An  # noqa: E402
 import covariables as Cov  # noqa: E402
 import panel as P  # noqa: E402
 
@@ -49,6 +50,7 @@ def table_modele() -> pd.DataFrame:
     d = d.dropna(subset=["delta_pct_voix_exp", "pct_diplome_sup", "pct_extreme_droite_pres"])
     d["gagne"] = d["liste_sortant_gagnante"].astype(float)
     d["log_inscrits"] = np.log(d["inscrits"])
+    d["taille"] = An.tranche_taille(d["inscrits"])
     d["election_2026"] = (d["annee"] == 2026).astype(int)
     d["bloc_prec"] = d["bloc_prec"].fillna("non_nuance").astype(str)
     for c in TRAITEMENTS:
