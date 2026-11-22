@@ -7,6 +7,8 @@ xlrd>=2.0           # (2.0) présidentielle 2017 (.xls)
 openpyxl>=3.1       # (3.1)
 geopandas>=0.14     # (1.2)
 matplotlib>=3.8     # (3.11)
+statsmodels>=0.14   # (0.15) régressions
+scikit-learn>=1.4   # (1.9) score de propension
 # Exécution des notebooks
 ipykernel>=6        # (7.4)
 nbconvert>=7        # (7.17)
