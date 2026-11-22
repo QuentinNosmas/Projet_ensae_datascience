@@ -231,3 +231,4 @@ data/processed/*
 *.gpkg
 *.shp
 .ipynb_checkpoints/
+!data/snapshots/*.csv

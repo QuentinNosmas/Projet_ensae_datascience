@@ -1,4 +1,14 @@
 {
+  "casier_politique_affaires": {
+    "downloaded_at": "2026-11-21T22:22:57+00:00",
+    "format": "json",
+    "path": "data/raw/casier_politique_affaires.json",
+    "producer": "Casier Politique (R. Jolivet), CC BY-NC-SA 4.0",
+    "sha256": "421bffe9bcb94e5b70e95d708d4b7103c93daf019531ce8209724f8fe0e9f25e",
+    "size_bytes": 1027630,
+    "source": "casier_politique_affaires",
+    "url": "https://casier-politique.fr/data/affaires.json"
+  },
   "cog2026_communes": {
     "downloaded_at": "2026-10-06T13:21:55+00:00",
     "encoding": "utf-8",
@@ -82,17 +92,17 @@
     "url": "https://www.insee.fr/fr/statistiques/fichier/8740222/v_mvt_commune_2026.csv"
   },
   "contours_communes_2025_50m": {
-    "downloaded_at": "2026-10-06T13:22:03+00:00",
+    "downloaded_at": "2026-11-22T17:48:36+00:00",
     "format": "geojson.gz",
     "path": "data/raw/contours_communes_2025_50m.geojson.gz",
     "producer": "data.gouv.fr (Etalab), ODbL",
     "sha256": "e311c36d55a50e5aaacbd9f7cf3707a4a00c5f24cd2a7fa43aba0f1cfdbb43bc",
     "size_bytes": 17577173,
     "source": "contours_communes_2025_50m",
-    "url": "https://object.data.gouv.fr/contours-administratifs/2025/geojson/communes-50m.geojson.gz"
+    "url": "https://contours-administratifs.s3.rbx.io.cloud.ovh.net/2025/geojson/communes-50m.geojson.gz"
   },
   "insee_diplomes_rp2023": {
-    "downloaded_at": "2026-10-06T13:26:21+00:00",
+    "downloaded_at": "2026-11-22T17:49:15+00:00",
     "extracted": [
       {
         "encoding": "utf-8",
@@ -141,7 +151,7 @@
     "url": "https://api.insee.fr/melodi/file/DS_RP_DIPLOMES_PRINC/DS_RP_DIPLOMES_PRINC_2023_CSV_FR"
   },
   "insee_filosofi_2023": {
-    "downloaded_at": "2026-10-06T13:05:15+00:00",
+    "downloaded_at": "2026-11-22T17:49:07+00:00",
     "extracted": [
       {
         "encoding": "utf-8",
@@ -189,7 +199,7 @@
     "url": "https://api.insee.fr/melodi/file/DS_FILOSOFI_CC/DS_FILOSOFI_CC_2023_CSV_FR"
   },
   "insee_population_rp2023": {
-    "downloaded_at": "2026-10-06T13:41:46+00:00",
+    "downloaded_at": "2026-11-22T17:49:44+00:00",
     "extracted": [
       {
         "encoding": "utf-8",
@@ -980,8 +990,111 @@
     "source": "muni2026_t2_communes",
     "url": "https://static.data.gouv.fr/resources/elections-municipales-2026-resultats-du-scond-tour/20260323-180124/municipales-2026-resultats-communes-2026-03-23-16h14.csv"
   },
+  "poligraph_affaires": {
+    "downloaded_at": "2026-11-21T22:22:59+00:00",
+    "encoding": "utf-8-sig",
+    "format": "csv",
+    "header": [
+      "poligraphId",
+      "Slug affaire",
+      "Titre",
+      "poligraphId politique",
+      "Slug politique",
+      "Politique",
+      "Parti actuel (abrégé)",
+      "Parti actuel",
+      "Position politique",
+      "Parti au moment (abrégé)",
+      "Parti au moment",
+      "Statut",
+      "Statut (code)",
+      "Catégorie",
+      "Catégorie (code)",
+      "Gravité",
+      "Gravité (code)",
+      "Implication",
+      "Implication (code)",
+      "Liée au mandat",
+      "Date des faits",
+      "Date de début",
+      "Date du verdict",
+      "Amende (EUR)",
+      "Prison (mois)",
+      "Prison, part non assortie du sursis (mois)",
+      "Inéligibilité (mois)",
+      "Inéligibilité, part non assortie du sursis (mois)",
+      "TIG (heures)",
+      "Appel",
+      "Peine (texte libre)",
+      "Autres peines",
+      "Juridiction",
+      "ECLI",
+      "Description",
+      "Nombre de sources",
+      "Première source (URL)",
+      "Première source (titre)",
+      "Page Poligraph",
+      "Créée le",
+      "Mise à jour le",
+      "Ordre de juridiction"
+    ],
+    "n_columns": 42,
+    "n_lines": 346,
+    "path": "data/raw/poligraph_affaires.csv",
+    "producer": "Poligraph (LD Engineering)",
+    "separator": ",",
+    "sha256": "429d276e96291300cbdf0912b18bff2e342475d62fa2590b1628876f5a9a37e0",
+    "size_bytes": 569238,
+    "source": "poligraph_affaires",
+    "url": "https://poligraph.fr/api/export/affaires?limit=50000"
+  },
+  "poligraph_politiques": {
+    "downloaded_at": "2026-11-21T22:23:04+00:00",
+    "encoding": "utf-8-sig",
+    "format": "csv",
+    "header": [
+      "poligraphId",
+      "Slug",
+      "Civilité",
+      "Prénom",
+      "Nom",
+      "Nom complet",
+      "Genre",
+      "Date de naissance",
+      "Lieu de naissance",
+      "Date de décès",
+      "poligraphId parti",
+      "Parti (abrégé)",
+      "Parti",
+      "Position politique",
+      "Mandat actuel",
+      "Titre du mandat",
+      "Début du mandat",
+      "Statut de publication du début de mandat",
+      "Fin du mandat",
+      "Circonscription",
+      "Code département",
+      "Nombre d'affaires",
+      "Fact-checks (mentions)",
+      "Score de prominence",
+      "Wikidata Q-ID",
+      "Photo",
+      "Profil Poligraph",
+      "Créé le",
+      "Mis à jour le"
+    ],
+    "n_columns": 29,
+    "n_lines": 212,
+    "path": "data/raw/poligraph_politiques.csv",
+    "producer": "Poligraph (LD Engineering)",
+    "separator": ",",
+    "sha256": "4d2c23ff56c85df92110b0e7e6cb6a4c6c14d995edd47166a73baadecd593f6b",
+    "size_bytes": 85612,
+    "source": "poligraph_politiques",
+    "url": "https://poligraph.fr/api/export/politiques?hasAffairs=true&activeOnly=false"
+  },
   "pres2017_t1_communes": {
-    "downloaded_at": "2026-10-06T13:26:25+00:00",
+    "downloaded_at": "2026-11-22T17:50:10+00:00",
     "format": "xls",
     "path": "data/raw/pres2017_t1_communes.xls",
     "producer": "Ministère de l'Intérieur",
@@ -991,7 +1104,7 @@
     "url": "https://static.data.gouv.fr/resources/election-presidentielle-des-23-avril-et-7-mai-2017-resultats-definitifs-du-1er-tour-par-communes/20170427-100544/Presidentielle_2017_Resultats_Communes_Tour_1_c.xls"
   },
   "pres2017_t2_communes": {
-    "downloaded_at": "2026-10-06T13:26:27+00:00",
+    "downloaded_at": "2026-11-22T17:50:18+00:00",
     "format": "xls",
     "path": "data/raw/pres2017_t2_communes.xls",
     "producer": "Ministère de l'Intérieur",
@@ -1001,7 +1114,7 @@
     "url": "https://static.data.gouv.fr/resources/election-presidentielle-des-23-avril-et-7-mai-2017-resultats-definitifs-du-2nd-tour-par-communes/20170511-093054/Presidentielle_2017_Resultats_Communes_Tour_2_c.xls"
   },
   "pres2022_t1_communes": {
-    "downloaded_at": "2026-10-06T13:41:54+00:00",
+    "downloaded_at": "2026-11-22T17:50:21+00:00",
     "encoding": "cp1252",
     "format": "txt",
     "header": [
@@ -1043,7 +1156,7 @@
     "url": "https://static.data.gouv.fr/resources/election-presidentielle-des-10-et-24-avril-2022-resultats-definitifs-du-1er-tour/20220414-152459/resultats-par-niveau-subcom-t1-france-entiere.txt"
   },
   "pres2022_t2_communes": {
-    "downloaded_at": "2026-10-06T13:41:56+00:00",
+    "downloaded_at": "2026-11-22T17:50:24+00:00",
     "encoding": "cp1252",
     "format": "txt",
     "header": [

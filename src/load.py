@@ -78,10 +78,23 @@ def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     return df.set_axis(cols, axis=1)
 
 
+def ensure_raw(source: str) -> None:
+    """Télécharge la source brute si elle manque (clone neuf du dépôt : data/raw est vide)."""
+    manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8")) if MANIFEST_PATH.exists() else {}
+    entry = manifest.get(source)
+    if entry is not None and (ROOT / entry["path"]).is_file():
+        return
+    log.info("%s : fichier brut absent, téléchargement", source)
+    sys.path.insert(0, str(ROOT / "scripts"))
+    import download_data  # noqa: PLC0415 (import tardif : inutile si les données sont là)
+
+    if download_data.main(["--only", source]) != 0:
+        raise RuntimeError(f"{source} : échec du téléchargement (voir scripts/download_data.py)")
+
+
 def manifest_entry(source: str, member: str | None = None) -> dict:
+    ensure_raw(source)
     manifest = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
-    if source not in manifest:
-        raise KeyError(f"{source} absent de MANIFEST.json : lancer scripts/download_data.py --only {source}")
     entry = manifest[source]
     if member is None:
         return entry
@@ -635,6 +648,91 @@ def load_pres2022() -> pd.DataFrame:
 
 
 # --------------------------------------------------------------------------
+# Affaires judiciaires (Casier Politique, Poligraph)
+# --------------------------------------------------------------------------
+MOIS_FR = {m: i for i, m in enumerate(
+    ["janvier", "fevrier", "mars", "avril", "mai", "juin", "juillet", "aout",
+     "septembre", "octobre", "novembre", "decembre"], start=1)}
+
+
+def date_naissance_from_text(text: object) -> pd.Timestamp:
+    """« Jean X, né le 1er juillet 1944 à Marseille, ... » -> 1944-07-01 (NaT si absent)."""
+    if not isinstance(text, str):
+        return pd.NaT
+    t = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode().lower()
+    m = re.search(r"\bnee? le (\d{1,2})(?:er)? ([a-z]+) (\d{4})", t)
+    if not m or m.group(2) not in MOIS_FR:
+        return pd.NaT
+    return pd.Timestamp(int(m.group(3)), MOIS_FR[m.group(2)], int(m.group(1)))
+
+
+def _casier_personnalites() -> list[dict]:
+    path = ROOT / manifest_entry("casier_politique_affaires")["path"]
+    return json.loads(path.read_text(encoding="utf-8"))["personnalites"]
+
+
+def load_casier_politique() -> pd.DataFrame:
+    """Casier Politique : une ligne par condamnation, avec l'identité de la personne.
+
+    ``personne_id`` = URL Wikipédia (unique par personne). Les dates au 1er janvier
+    sont le plus souvent une année seule (``date_precise`` = False).
+    """
+    rows = []
+    for p in _casier_personnalites():
+        for c in p["condamnations"]:
+            rows.append({
+                "personne_id": p["wikipedia"], "nom_complet": p["nom"],
+                "date_naissance": date_naissance_from_text(p["description"]),
+                "date_condamnation": c["date"], "affaire": c["affaire"],
+                "description": c["description"], "infraction": c["infraction"],
+                "categories": "; ".join(c["categories"]), "juridiction": c["juridiction"],
+                "parti": c["parti"], "prison_mois": c["prison_mois"],
+                "amende_montant": c["amende_montant"],
+                "ineligibilite_mois": c["ineligibilite_mois"], "recours": c["recours"],
+            })
+    df = pd.DataFrame(rows)
+    df["date_condamnation"] = pd.to_datetime(df["date_condamnation"], errors="coerce")
+    df["date_precise"] = ~((df["date_condamnation"].dt.month == 1) & (df["date_condamnation"].dt.day == 1))
+    for c in ("prison_mois", "amende_montant", "ineligibilite_mois"):
+        df[c] = to_num(df[c])
+    return df
+
+
+def load_casier_politique_mandats() -> pd.DataFrame:
+    """Casier Politique : une ligne par mandat (sert à vérifier la commune d'un maire)."""
+    rows = [{"personne_id": p["wikipedia"], "nom_complet": p["nom"], **m}
+            for p in _casier_personnalites() for m in p["mandats"]]
+    df = pd.DataFrame(rows)
+    for c in ("debut", "fin"):
+        df[c] = pd.to_datetime(df[c], errors="coerce")
+    return df
+
+
+def load_poligraph_affaires() -> pd.DataFrame:
+    """Poligraph : une ligne par affaire (tous statuts, de la plainte à la condamnation)."""
+    df = normalize_columns(read_csv_raw("poligraph_affaires"))
+    df = df.rename(columns={"poligraphid": "affaire_id", "poligraphid_politique": "personne_id",
+                            "date_des_faits": "date_faits", "date_de_debut": "date_debut",
+                            "date_du_verdict": "date_verdict"})
+    for c in df.columns:
+        df[c] = clean_str(df[c])
+    for c in ("date_faits", "date_debut", "date_verdict"):
+        df[c] = pd.to_datetime(df[c], errors="coerce")
+    for c in ("amende_eur", "prison_mois", "ineligibilite_mois"):
+        df[c] = to_num(df[c])
+    return df
+
+
+def load_poligraph_politiques() -> pd.DataFrame:
+    """Poligraph : personnalités ayant au moins une affaire (identité, Q-ID Wikidata)."""
+    df = normalize_columns(read_csv_raw("poligraph_politiques"))
+    df = df.rename(columns={"poligraphid": "personne_id", "wikidata_q_id": "wikidata"})
+    for c in df.columns:
+        df[c] = clean_str(df[c])
+    return _parse_dates(df)
+
+
+# --------------------------------------------------------------------------
 # Écriture
 # --------------------------------------------------------------------------
 LOADERS: dict[str, Callable[[], pd.DataFrame]] = {
@@ -657,6 +755,10 @@ LOADERS: dict[str, Callable[[], pd.DataFrame]] = {
     "population": load_population,
     "presidentielle_2017": load_pres2017,
     "presidentielle_2022": load_pres2022,
+    "casier_politique": load_casier_politique,
+    "casier_politique_mandats": load_casier_politique_mandats,
+    "poligraph_affaires": load_poligraph_affaires,
+    "poligraph_politiques": load_poligraph_politiques,
 }
 
 
