@@ -51,7 +51,7 @@ l'empreinte SHA-256 de chaque fichier utilisé. Les deux bases d'affaires étant
 | `src/affaires.py` | rattachement des affaires judiciaires aux sortants, variables de traitement |
 | `src/covariables.py` | recensement, revenus, présidentielles : contexte de chaque commune |
 | `src/analyse.py` | comparaisons à taille de commune égale, intervalles bootstrap |
-| `src/modeles.py` | régressions (MCO, logit), appariement sur score de propension, permutations |
+| `src/modeles.py` | régressions (MCO, logit), appariement sur score de propension |
 | `src/graphiques.py` | charte graphique, carte, graphique des estimations |
 | `notebooks/00_synthese.ipynb` | synthèse d'étape : la démarche et les premiers résultats |
 | `notebooks/01_exploration.ipynb` | diagnostic des sources |

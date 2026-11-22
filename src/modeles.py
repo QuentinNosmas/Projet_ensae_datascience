@@ -13,7 +13,6 @@
 from __future__ import annotations
 
 import sys
-import warnings
 from pathlib import Path
 
 import numpy as np
@@ -140,43 +139,3 @@ def appariement(d: pd.DataFrame, traitement: str, resultats: list[str], k: int =
             "effets": pd.DataFrame(effets).T, "equilibre": equilibre,
             "score": pd.DataFrame({"logit_ps": lp, "traite": t})}
 
-
-# --------------------------------------------------------------------------
-# Inférence par permutation
-# --------------------------------------------------------------------------
-def permutation(d: pd.DataFrame, formule: str, variable: str, parmi: str, n_perm: int = 500,
-                logistique: bool = False, seed: int = 0) -> dict:
-    """p-valeur de permutation du coefficient de ``variable``.
-
-    On redistribue au hasard ``variable`` entre les lignes où ``parmi`` vaut 1
-    (par exemple : l'affaire révélée pendant le mandat entre toutes les
-    personnalités recensées), en gardant le nombre de traités. Sous l'hypothèse
-    d'absence d'effet, le coefficient observé est un tirage comme un autre :
-    la p-valeur est la part des permutations qui donnent un coefficient au
-    moins aussi grand en valeur absolue.
-
-    Logit : un tirage dont l'estimation ne converge pas (quasi-séparation, par
-    exemple une catégorie rare où toutes les listes gagnent) est écarté et compté.
-    """
-    def ajuster(x: pd.DataFrame) -> float:
-        if not logistique:
-            return smf.ols(formule, data=x).fit().params[variable]
-        with warnings.catch_warnings():
-            warnings.simplefilter("ignore")  # non-convergence : testée juste après
-            r = smf.logit(formule, data=x).fit(disp=0, maxiter=300)
-        return r.params[variable] if r.mle_retvals["converged"] else np.nan
-
-    observe = ajuster(d)
-    rng = np.random.default_rng(seed)
-    lignes = np.flatnonzero(d[parmi].to_numpy() == 1)
-    valeurs = d[variable].to_numpy()[lignes]
-    tirages = np.empty(n_perm)
-    x = d.copy()
-    for i in range(n_perm):
-        v = x[variable].to_numpy().copy()
-        v[lignes] = rng.permutation(valeurs)
-        x[variable] = v
-        tirages[i] = ajuster(x)
-    valides = tirages[~np.isnan(tirages)]
-    return {"coef": observe, "p_permutation": float((np.abs(valides) >= abs(observe)).mean()),
-            "tirages": valides, "non_convergents": int(np.isnan(tirages).sum())}
