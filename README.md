@@ -25,7 +25,8 @@ jupyter nbconvert --to notebook --execute --inplace notebooks/00_synthese.ipynb
 ```
 
 Les données ne sont pas versionnées. Au premier lancement, chaque source manquante
-est téléchargée depuis son URL publique (environ 400 Mo, quelques minutes), puis
+est téléchargée depuis son URL publique (environ 550 Mo, quelques minutes ; prévoir 2 Go
+d'espace disque une fois les archives décompressées), puis
 nettoyée dans `data/processed/`. On peut aussi tout préparer à l'avance :
 
 ```bash
