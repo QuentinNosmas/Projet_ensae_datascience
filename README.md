@@ -57,7 +57,7 @@ l'empreinte SHA-256 de chaque fichier utilisé. Les deux bases d'affaires étant
 | `notebooks/01_exploration.ipynb` | diagnostic des sources |
 | `notebooks/02_panel_sortants.ipynb` | comportement d'un sortant « ordinaire » |
 | `notebooks/03_affaires.ipynb` | affaires judiciaires : rattachement, description, carte, comparaisons à taille égale |
-| `notebooks/04_modelisation.ipynb` | régressions, appariement, délai, participation, robustesse |
+| `notebooks/04_modelisation.ipynb` | régressions, appariement, délai, participation, bord politique, robustesse |
 
 ## Sources
 
