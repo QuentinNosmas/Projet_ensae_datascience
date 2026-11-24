@@ -29,7 +29,16 @@ import covariables as Cov  # noqa: E402
 import panel as P  # noqa: E402
 
 TRAITEMENTS = ["affaire_connue", "affaire_mandat", "affaire_apres", "personnalite_affaires",
-               "affaire_probite_connue", "condamne_avant"]
+               "affaire_probite_connue", "condamne_avant",
+               "affaire_niveau", "affaire_soupcon", "affaire_procedure", "affaire_condamnation",
+               "affaire_blanchi"]
+
+# Gradation de l'affaire au vote (src/affaires.py) : score ordinal 0-3 (effet
+# « dose-réponse », un seul coefficient) ou une indicatrice par niveau. Les élus
+# déjà blanchis forment un groupe à part, comparé aux sortants sans affaire.
+GRADATION_ORDINALE = "affaire_niveau + affaire_blanchi + personnalite_affaires"
+GRADATION_NIVEAUX = ("affaire_soupcon + affaire_procedure + affaire_condamnation + affaire_blanchi"
+                     " + personnalite_affaires")
 
 # Contrôles communs à tous les modèles. Le score précédent capte le retour vers
 # la moyenne (un sortant très bien élu a plus à perdre).
