@@ -142,7 +142,7 @@ SOURCES: dict[str, dict[str, str]] = {
         "producer": MI,
     },
     # 3. Candidats et têtes de liste -------------------------------------------
-    # TODO : candidatures 2014. Pas de fichier France entière sur data.gouv.fr,
+    # Non retenu : candidatures 2014. Pas de fichier France entière sur data.gouv.fr,
     #   seulement environ 24 .xls régionaux par jeu (ids 53699396a3a729239d20422d
     #   et 53699396a3a729239d20422c). Les têtes de liste 2014 sont reprises
     #   depuis les fichiers de résultats muni2014_*.
@@ -212,7 +212,7 @@ SOURCES: dict[str, dict[str, str]] = {
         "producer": "INSEE",
     },
     # 5. Contours des communes ---------------------------------------------------
-    # TODO : IGN ADMIN EXPRESS COG. data.gouv.fr (id 5808de39c751df1e0679df72) ne
+    # Non retenu : IGN ADMIN EXPRESS COG. data.gouv.fr (id 5808de39c751df1e0679df72) ne
     #   donne qu'une page web et des flux WMS/WFS, pas de lien de téléchargement direct.
     # Alternative : « Contours administratifs », data.gouv.fr (Etalab), licence ODbL,
     # millésime 2025, simplification 50 m. Conservé compressé (.gz).
