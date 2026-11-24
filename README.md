@@ -75,18 +75,34 @@ Le détail est dans [`notebooks/00_synthese.ipynb`](notebooks/00_synthese.ipynb)
 
 ## Reproduire les résultats
 
+**Prérequis.** Python 3.12 (versions testées dans `requirements.txt`), une connexion
+internet, environ 2 Go d'espace disque. Compter de 30 minutes à 1 heure au premier
+lancement, surtout pour le téléchargement : environ 550 Mo, dont des fichiers de l'API
+de l'INSEE parfois lente.
+
+**1. Récupérer le projet et installer l'environnement**
+
 ```bash
-python -m venv .venv && source .venv/bin/activate   # Python 3.12 conseillé
+git clone https://github.com/QuentinNosmas/Projet_ensae_datascience.git
+cd Projet_ensae_datascience
+python -m venv .venv
+source .venv/bin/activate          # Windows (PowerShell) : .venv\Scripts\activate
 pip install -r requirements.txt
-jupyter nbconvert --to notebook --execute --inplace notebooks/0*.ipynb
 ```
 
-Les données ne sont pas versionnées. Au premier lancement, chaque source manquante
-est téléchargée depuis son URL publique (environ 550 Mo ; prévoir 2 Go
-d'espace disque une fois les archives décompressées), puis
-nettoyée dans `data/processed/`. L'API de l'INSEE coupe parfois les transferts
-longs : le téléchargement reprend alors automatiquement là où il s'était arrêté, et
-un nouveau lancement repart du fichier partiel. On peut aussi tout préparer à l'avance :
+**2. Exécuter les notebooks**
+
+```bash
+python -m jupyter nbconvert --to notebook --execute --inplace notebooks/0*.ipynb
+```
+
+Les données ne sont pas versionnées : au premier lancement, chaque source manquante est
+téléchargée depuis son URL publique dans `data/raw/`, puis nettoyée dans
+`data/processed/`. Si l'API de l'INSEE coupe un transfert, le téléchargement reprend
+automatiquement là où il s'était arrêté ; en cas d'échec, relancer la commande repart du
+fichier partiel.
+
+On peut aussi préparer les données à l'avance, étape par étape :
 
 ```bash
 python scripts/download_data.py   # data/raw/ ; --list pour voir les sources
@@ -94,19 +110,36 @@ python src/load.py                # data/processed/*.parquet
 python src/panel.py               # panel maire sortant x élection
 python src/affaires.py            # affaires rattachées au panel
 python src/covariables.py         # contexte socio-économique et politique des communes
-python scripts/figures.py         # figures du README (docs/figures/), après exécution des notebooks
 ```
 
-`data/MANIFEST.json` (versionné) garde l'URL, la date de téléchargement et
-l'empreinte SHA-256 de chaque fichier utilisé. Les deux bases d'affaires étant mises
-à jour en continu, on en versionne un instantané daté (`data/snapshots/`, 1,8 Mo) ;
-`python scripts/download_data.py --live` récupère la version du jour.
+**3. Régénérer les figures du README** (après l'étape 2)
 
-**Sous Windows.** Placer le projet dans un chemin court (par exemple `C:\projets\`) :
-au-delà de 260 caractères, Windows refuse de charger certaines bibliothèques de
-`geopandas` installées dans `.venv`, et la carte des communes échoue. Le fichier
-`.gitattributes` garde les instantanés de données intacts malgré la conversion des
-fins de ligne, pour que leurs empreintes correspondent au manifeste.
+```bash
+python scripts/figures.py         # docs/figures/*.png, extraites des notebooks exécutés
+```
+
+**4. Vérifier la reproduction.** Le notebook `00_synthese` doit afficher notamment :
+43 729 communes x élection dans le panel, 741 affaires recensées, 75 sortants avec une
+affaire connue au vote (dont 40 révélée pendant le mandat), 6 772 observations dans les
+modèles et, à notoriété égale, un effet de -29,3 points sur la probabilité de victoire
+(IC 95 % de -57,5 à -1,2).
+
+**Traçabilité des données.** `data/MANIFEST.json` (versionné) garde l'URL, la date de
+téléchargement et l'empreinte SHA-256 de chaque fichier utilisé ; il n'est réécrit que si
+un fichier change. Les deux bases d'affaires étant mises à jour en continu, on en
+versionne un instantané daté (`data/snapshots/`, 1,8 Mo), utilisé par défaut ;
+`python scripts/download_data.py --live` récupère la version du jour (les résultats
+peuvent alors changer).
+
+**Sous Windows.**
+
+- Placer le projet dans un chemin court (par exemple `C:\projets\`) : au-delà de 260
+  caractères, Windows refuse de charger certaines bibliothèques de `geopandas`, et la
+  carte des communes échoue (« DLL load failed… nom de fichier trop long »).
+- Lancer Jupyter par `python -m jupyter` plutôt que `jupyter` : le lanceur `jupyter.exe`
+  garde en dur le chemin de Python de l'installation.
+- Le fichier `.gitattributes` garde les instantanés de données intacts malgré la
+  conversion des fins de ligne, pour que leurs empreintes correspondent au manifeste.
 
 ## Organisation
 
@@ -121,7 +154,7 @@ fins de ligne, pour que leurs empreintes correspondent au manifeste.
 | `src/analyse.py` | comparaisons à taille de commune égale, intervalles bootstrap |
 | `src/modeles.py` | régressions (MCO, logit), appariement sur score de propension |
 | `src/graphiques.py` | charte graphique, carte, graphique des estimations |
-| `notebooks/00_synthese.ipynb` | synthèse d'étape : la démarche et les premiers résultats |
+| `notebooks/00_synthese.ipynb` | synthèse : la démarche, les résultats et leurs limites |
 | `notebooks/01_exploration.ipynb` | diagnostic des sources |
 | `notebooks/02_panel_sortants.ipynb` | comportement d'un sortant « ordinaire » |
 | `notebooks/03_affaires.ipynb` | affaires judiciaires : rattachement, description, carte, comparaisons à taille égale |
