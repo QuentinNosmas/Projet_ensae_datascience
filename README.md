@@ -17,16 +17,40 @@ contexte socio-économique et présidentiel), appariement sur score de propensio
 comparaison à « notoriété égale » avec les élus dont l'affaire n'éclatera qu'après
 le vote.
 
+![Carte des sortants visés par une affaire connue au vote, selon l'issue du scrutin](docs/figures/carte.png)
+
+*Les sortants visés par une affaire connue au vote se concentrent en Île-de-France, sur
+le pourtour méditerranéen et dans quelques grandes villes. La plupart se représentent et
+gagnent.*
+
 ## Résultats
 
 1. **Pas de sanction électorale robuste.** Les sortants visés par une affaire se
    représentent, conservent leur score et gagnent aussi souvent que des sortants
    comparables. Aucune approche ne trouve de perte de voix significative.
+
+   ![Effet d'une affaire révélée pendant le mandat, selon l'approche](docs/figures/estimations.png)
+
+   *Sur le score, tous les intervalles contiennent zéro. Sur la victoire, seule la
+   comparaison à notoriété égale (4) trouve un effet négatif.*
+
 2. **Deux pièges expliquent les comparaisons naïves.** Le retour vers la moyenne :
    ces sortants avaient été moins bien élus la fois précédente (52 % contre 62 %),
    donc avaient moins à perdre ; la perte apparente de 5 points en 2026 disparaît
    une fois le score précédent contrôlé. La prime de notoriété : les élus recensés
    (grandes villes, figures nationales) gagnent davantage que les autres.
+
+   ![Retour vers la moyenne : évolution du score selon le score précédent](docs/figures/retour_moyenne.png)
+
+   *Mieux un sortant était élu, plus il recule. Les sortants visés par une affaire
+   (en orange) partaient de plus bas, mais restent de part et d'autre de la courbe
+   des sortants ordinaires.*
+
+   ![Taux de victoire selon la notoriété et le stade de l'affaire](docs/figures/victoire_par_groupe.png)
+
+   *Les personnalités dont l'affaire n'éclatera qu'après le vote gagnent 93 % du
+   temps, contre 74 % pour les sortants ordinaires : c'est la prime de notoriété.*
+
 3. **Un seul indice de sanction, fragile.** À notoriété égale, une affaire révélée
    pendant le mandat réduit la probabilité de victoire d'environ 29 points
    (IC 95 % de -57 à -1, p = 0,04), sur une trentaine de cas et surtout en 2020.
@@ -36,6 +60,11 @@ le vote.
    de victoire d'environ 26 points (p = 0,08), sans écart significatif avec une
    affaire pas encore jugée, et les élus déjà blanchis ne sont pas sanctionnés de
    façon détectable.
+
+   ![Effet de l'affaire selon son stade au vote](docs/figures/stade_affaire.png)
+
+   *À notoriété égale, aucun stade ne coûte de voix ; les intervalles sur la victoire
+   sont très larges, faute de cas.*
 
 **Portée.** Les bases d'affaires ne couvrent que les élus assez connus pour avoir
 une page Wikipédia ou une fiche Poligraph : les résultats valent pour les maires de
@@ -65,6 +94,7 @@ python src/load.py                # data/processed/*.parquet
 python src/panel.py               # panel maire sortant x élection
 python src/affaires.py            # affaires rattachées au panel
 python src/covariables.py         # contexte socio-économique et politique des communes
+python scripts/figures.py         # figures du README (docs/figures/), après exécution des notebooks
 ```
 
 `data/MANIFEST.json` (versionné) garde l'URL, la date de téléchargement et
@@ -83,6 +113,7 @@ fins de ligne, pour que leurs empreintes correspondent au manifeste.
 | Fichier | Rôle |
 |---|---|
 | `scripts/download_data.py` | téléchargement reproductible des sources (reprise, contrôles) |
+| `scripts/figures.py` | export des figures du README depuis les notebooks exécutés |
 | `src/load.py` | lecture et nettoyage de chaque source, codes INSEE harmonisés |
 | `src/panel.py` | panel « maire sortant x élection » : candidature, score, victoire |
 | `src/affaires.py` | rattachement des affaires judiciaires aux sortants, variables de traitement, stade de l'affaire au vote |
