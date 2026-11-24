@@ -1,6 +1,6 @@
 # Les électeurs sanctionnent-ils vraiment ?
 
-Projet de data science (ENSAE 2A, cours « Python pour la data science »).
+Projet personnel de data science.
 
 **Question.** Un maire visé par une affaire judiciaire (enquête, mise en examen,
 condamnation) est-il sanctionné par les électeurs aux élections municipales
@@ -49,7 +49,7 @@ l'empreinte SHA-256 de chaque fichier utilisé. Les deux bases d'affaires étant
 | `scripts/download_data.py` | téléchargement reproductible des sources (reprise, contrôles) |
 | `src/load.py` | lecture et nettoyage de chaque source, codes INSEE harmonisés |
 | `src/panel.py` | panel « maire sortant x élection » : candidature, score, victoire |
-| `src/affaires.py` | rattachement des affaires judiciaires aux sortants, variables de traitement |
+| `src/affaires.py` | rattachement des affaires judiciaires aux sortants, variables de traitement, stade de l'affaire au vote |
 | `src/covariables.py` | recensement, revenus, présidentielles : contexte de chaque commune |
 | `src/analyse.py` | comparaisons à taille de commune égale, intervalles bootstrap |
 | `src/modeles.py` | régressions (MCO, logit), appariement sur score de propension |
@@ -58,7 +58,7 @@ l'empreinte SHA-256 de chaque fichier utilisé. Les deux bases d'affaires étant
 | `notebooks/01_exploration.ipynb` | diagnostic des sources |
 | `notebooks/02_panel_sortants.ipynb` | comportement d'un sortant « ordinaire » |
 | `notebooks/03_affaires.ipynb` | affaires judiciaires : rattachement, description, carte, comparaisons à taille égale |
-| `notebooks/04_modelisation.ipynb` | régressions, appariement, délai, participation, bord politique, robustesse |
+| `notebooks/04_modelisation.ipynb` | régressions, appariement, délai, participation, bord politique, stade de l'affaire, robustesse |
 
 ## Sources
 
