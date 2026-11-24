@@ -44,7 +44,7 @@ MANIFEST_PATH = ROOT / "data" / "MANIFEST.json"
 # sans eux, les résultats changeraient d'un jour à l'autre. --live les ignore.
 SNAPSHOT_DIR = ROOT / "data" / "snapshots"
 
-USER_AGENT = "Projet-ENSAE-probite-maires/1.0 (projet etudiant ENSAE; python-requests)"
+USER_AGENT = "Projet-probite-maires/1.0 (projet personnel de data science; python-requests)"
 TIMEOUT = (15, 120)  # (connexion, lecture) en secondes
 MAX_RETRIES = 4
 PAUSE_BETWEEN_FILES = 1.5  # secondes, pour ménager les serveurs
@@ -433,12 +433,19 @@ def download(url: str, dest: Path, session: requests.Session, name: str, is_zip:
 
     Après une coupure, reprend où il s'était arrêté (en-tête Range) si le serveur
     l'accepte. Un zip n'est renommé qu'après vérification de son intégrité.
+
+    Certains serveurs (API Melodi de l'INSEE) coupent régulièrement les transferts
+    longs : une tentative qui a fait progresser le fichier ne compte pas dans les
+    ``MAX_RETRIES`` essais, et le .part est conservé en cas d'échec pour que le
+    lancement suivant reprenne là où celui-ci s'est arrêté.
     """
     tmp = dest.with_name(dest.name + ".part")
-    tmp.unlink(missing_ok=True)
-    for attempt in range(1, MAX_RETRIES + 1):
+    attempt = 0
+    while True:
+        attempt += 1
+        debut = tmp.stat().st_size if tmp.exists() else 0
         try:
-            done = tmp.stat().st_size if tmp.exists() else 0
+            done = debut
             headers = {"Range": f"bytes={done}-"} if done else {}
             with session.get(url, stream=True, timeout=TIMEOUT, headers=headers) as r:
                 r.raise_for_status()
@@ -469,10 +476,11 @@ def download(url: str, dest: Path, session: requests.Session, name: str, is_zip:
             os.replace(tmp, dest)
             return
         except (requests.RequestException, OSError) as exc:
-            if attempt == MAX_RETRIES:
-                tmp.unlink(missing_ok=True)
+            if tmp.exists() and tmp.stat().st_size > debut:
+                attempt = 0  # le transfert avance : on continue sans entamer le quota d'essais
+            elif attempt >= MAX_RETRIES:
                 raise
-            wait = 2**attempt
+            wait = 2 ** max(attempt, 1)
             log.warning("%s : tentative %d/%d échouée (%s), nouvel essai dans %ds",
                         name, attempt, MAX_RETRIES, exc, wait)
             time.sleep(wait)
@@ -581,8 +589,14 @@ def process(name: str, src: dict[str, str], session: requests.Session,
         entry["extracted"] = [describe_file(p, p.suffix.lstrip(".").lower()) for p in files]
         log.info("%s : %d fichier(s) extrait(s) dans %s", name, len(files), (RAW_DIR / name).relative_to(ROOT))
 
-    manifest[name] = entry
-    save_manifest(manifest)
+    previous = manifest.get(name, {})
+    if previous.get("sha256") == entry["sha256"] and previous.get("url") == entry["url"]:
+        # Même fichier qu'au dernier téléchargement : on garde l'entrée (et sa date)
+        # pour ne pas modifier le manifeste versionné à chaque exécution.
+        entry = previous
+    else:
+        manifest[name] = entry
+        save_manifest(manifest)
     log.info("%s : OK (%.1f Mo, %s lignes, sha256 %s…)", name, entry["size_bytes"] / 1e6,
              entry.get("n_lines", "n/a"), entry["sha256"][:12])
     return True
