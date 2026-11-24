@@ -36,9 +36,10 @@ TRAITEMENTS = ["affaire_connue", "affaire_mandat", "affaire_apres", "personnalit
 # Gradation de l'affaire au vote (src/affaires.py) : score ordinal 0-3 (effet
 # « dose-réponse », un seul coefficient) ou une indicatrice par niveau. Les élus
 # déjà blanchis forment un groupe à part, comparé aux sortants sans affaire.
+# Soupçon et procédure sont regroupés (« avant jugement ») : chacun ne compte que
+# quelques sortants, tous ou presque réélus, ce qui empêche le logit de converger.
 GRADATION_ORDINALE = "affaire_niveau + affaire_blanchi + personnalite_affaires"
-GRADATION_NIVEAUX = ("affaire_soupcon + affaire_procedure + affaire_condamnation + affaire_blanchi"
-                     " + personnalite_affaires")
+GRADATION_NIVEAUX = "affaire_avant_jugement + affaire_condamnation + affaire_blanchi + personnalite_affaires"
 
 # Contrôles communs à tous les modèles. Le score précédent capte le retour vers
 # la moyenne (un sortant très bien élu a plus à perdre).
@@ -64,6 +65,7 @@ def table_modele() -> pd.DataFrame:
     for c in TRAITEMENTS:
         d[c] = d[c].astype(int)
     d["affaire_avant_mandat"] = d["affaire_connue"] - d["affaire_mandat"]
+    d["affaire_avant_jugement"] = d["affaire_soupcon"] + d["affaire_procedure"]
     vote = pd.to_datetime(d["annee"].map(P.DATES_PREMIER_TOUR))
     d["delai_annees"] = (vote - d["premiere_affaire"]).dt.days / 365.25
     return d.reset_index(drop=True)
