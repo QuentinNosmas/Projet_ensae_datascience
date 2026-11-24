@@ -7,27 +7,57 @@ condamnation) est-il sanctionné par les électeurs aux élections municipales
 suivantes ? On compare les maires sortants des municipales de 2020 et de 2026 selon
 qu'une affaire était connue ou non au moment du vote.
 
-**Premiers résultats.** Aucune sanction électorale robuste n'est détectable : les sortants visés
-par une affaire conservent leur score et gagnent aussi souvent que des sortants
-comparables. Les comparaisons naïves sont trompées par le retour vers la moyenne et
-par la prime électorale des élus notoires. À notoriété égale, une affaire révélée
-pendant le mandat réduirait la probabilité de victoire d'environ 30 points, un
-résultat à la limite de la significativité (une trentaine de cas).
+**Démarche.** On rapproche 741 affaires judiciaires recensées par deux bases
+citoyennes (Casier Politique, Poligraph) des maires sortants de près de 44 000
+communes x élection. Après élimination des homonymes et des maires partis en cours
+de mandat, 75 sortants avaient une affaire connue au moment du vote. On les compare
+à des sortants comparables par quatre approches : à taille de commune égale,
+régressions avec contrôles (score précédent, taille, compétition, bord politique,
+contexte socio-économique et présidentiel), appariement sur score de propension, et
+comparaison à « notoriété égale » avec les élus dont l'affaire n'éclatera qu'après
+le vote.
 
-**Projet en cours.** Synthèse d'étape : [`notebooks/00_synthese.ipynb`](notebooks/00_synthese.ipynb).
+## Résultats
+
+1. **Pas de sanction électorale robuste.** Les sortants visés par une affaire se
+   représentent, conservent leur score et gagnent aussi souvent que des sortants
+   comparables. Aucune approche ne trouve de perte de voix significative.
+2. **Deux pièges expliquent les comparaisons naïves.** Le retour vers la moyenne :
+   ces sortants avaient été moins bien élus la fois précédente (52 % contre 62 %),
+   donc avaient moins à perdre ; la perte apparente de 5 points en 2026 disparaît
+   une fois le score précédent contrôlé. La prime de notoriété : les élus recensés
+   (grandes villes, figures nationales) gagnent davantage que les autres.
+3. **Un seul indice de sanction, fragile.** À notoriété égale, une affaire révélée
+   pendant le mandat réduit la probabilité de victoire d'environ 29 points
+   (IC 95 % de -57 à -1, p = 0,04), sur une trentaine de cas et surtout en 2020.
+4. **Ni le bord politique ni le stade de l'affaire ne changent ce constat.**
+   La sanction ne paraît pas plus forte à gauche qu'à droite (écart non
+   significatif). Une condamnation prononcée avant le vote réduirait la probabilité
+   de victoire d'environ 26 points (p = 0,08), sans écart significatif avec une
+   affaire pas encore jugée, et les élus déjà blanchis ne sont pas sanctionnés de
+   façon détectable.
+
+**Portée.** Les bases d'affaires ne couvrent que les élus assez connus pour avoir
+une page Wikipédia ou une fiche Poligraph : les résultats valent pour les maires de
+villes moyennes et grandes, pas pour les petites communes. Avec quelques dizaines
+de cas, seul un effet important serait détectable.
+
+Le détail est dans [`notebooks/00_synthese.ipynb`](notebooks/00_synthese.ipynb).
 
 ## Reproduire les résultats
 
 ```bash
 python -m venv .venv && source .venv/bin/activate   # Python 3.12 conseillé
 pip install -r requirements.txt
-jupyter nbconvert --to notebook --execute --inplace notebooks/00_synthese.ipynb
+jupyter nbconvert --to notebook --execute --inplace notebooks/0*.ipynb
 ```
 
 Les données ne sont pas versionnées. Au premier lancement, chaque source manquante
-est téléchargée depuis son URL publique (environ 550 Mo, quelques minutes ; prévoir 2 Go
+est téléchargée depuis son URL publique (environ 550 Mo ; prévoir 2 Go
 d'espace disque une fois les archives décompressées), puis
-nettoyée dans `data/processed/`. On peut aussi tout préparer à l'avance :
+nettoyée dans `data/processed/`. L'API de l'INSEE coupe parfois les transferts
+longs : le téléchargement reprend alors automatiquement là où il s'était arrêté, et
+un nouveau lancement repart du fichier partiel. On peut aussi tout préparer à l'avance :
 
 ```bash
 python scripts/download_data.py   # data/raw/ ; --list pour voir les sources
@@ -41,6 +71,12 @@ python src/covariables.py         # contexte socio-économique et politique des 
 l'empreinte SHA-256 de chaque fichier utilisé. Les deux bases d'affaires étant mises
 à jour en continu, on en versionne un instantané daté (`data/snapshots/`, 1,8 Mo) ;
 `python scripts/download_data.py --live` récupère la version du jour.
+
+**Sous Windows.** Placer le projet dans un chemin court (par exemple `C:\projets\`) :
+au-delà de 260 caractères, Windows refuse de charger certaines bibliothèques de
+`geopandas` installées dans `.venv`, et la carte des communes échoue. Le fichier
+`.gitattributes` garde les instantanés de données intacts malgré la conversion des
+fins de ligne, pour que leurs empreintes correspondent au manifeste.
 
 ## Organisation
 
