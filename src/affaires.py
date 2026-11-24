@@ -316,9 +316,19 @@ def variables_traitement(aff_sortants: pd.DataFrame) -> pd.DataFrame:
         "affaire_apres": a["moment"] == "apres_scrutin",
         "affaire_ambigue": a["moment"].isin(["ambigue", "sans_date"]),
     })
+    cle = [a["annee"], a["code_insee"]]
     out = flags.groupby(["annee", "code_insee"]).any()
-    out["n_affaires_connues"] = connue.groupby([a["annee"], a["code_insee"]]).sum()
-    out["premiere_affaire"] = a["date_publique"].where(connue).groupby([a["annee"], a["code_insee"]]).min()
+    out["n_affaires_connues"] = connue.groupby(cle).sum()
+    out["premiere_affaire"] = a["date_publique"].where(connue).groupby(cle).min()
+
+    # Gradation : stade le plus avancé parmi les affaires connues au vote (0 = aucune
+    # affaire active). Un sortant n'est « blanchi » que si toutes ses affaires connues
+    # se sont soldées par une relaxe, un non-lieu ou un classement avant le vote.
+    niveau = a["niveau_vote"].where(connue).groupby(cle).max().fillna(0).astype(int)
+    out["affaire_niveau"] = niveau
+    for n, nom in ((1, "soupcon"), (2, "procedure"), (3, "condamnation")):
+        out[f"affaire_{nom}"] = niveau == n
+    out["affaire_blanchi"] = (connue & a["blanchi_avant"]).groupby(cle).any() & (niveau == 0)
     return out.reset_index()
 
 
@@ -331,10 +341,12 @@ def build() -> tuple[pd.DataFrame, pd.DataFrame]:
 
     traite = variables_traitement(aff_sortants)
     p = panel.merge(traite, on=["annee", "code_insee"], how="left")
-    bool_cols = [c for c in traite.columns if c not in ("annee", "code_insee", "n_affaires_connues", "premiere_affaire")]
+    compteurs = ("n_affaires_connues", "affaire_niveau")
+    bool_cols = [c for c in traite.columns if c not in ("annee", "code_insee", "premiere_affaire", *compteurs)]
     for c in bool_cols:
         p[c] = p[c].astype("boolean").fillna(False)
-    p["n_affaires_connues"] = p["n_affaires_connues"].fillna(0).astype("Int64")
+    for c in compteurs:
+        p[c] = p[c].fillna(0).astype("Int64")
     p["personnalite_affaires"] = pd.MultiIndex.from_frame(p[["annee", "code_insee"]]).isin(
         pd.MultiIndex.from_frame(ok[["annee", "code_insee"]]))
     return p, aff_sortants
@@ -348,6 +360,8 @@ def main() -> int:
     cols = ["personnalite_affaires", "affaire_connue", "affaire_mandat", "affaire_probite_mandat",
             "condamne_avant", "affaire_apres", "affaire_ambigue"]
     log.info("sortants concernés par élection :\n%s", p.groupby("annee")[cols].sum().to_string())
+    gradation = ["affaire_soupcon", "affaire_procedure", "affaire_condamnation", "affaire_blanchi"]
+    log.info("stade de l'affaire au vote :\n%s", p.groupby("annee")[gradation].sum().to_string())
     return 0
 
 
