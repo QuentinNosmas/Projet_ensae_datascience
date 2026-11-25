@@ -1,7 +1,8 @@
 # Les électeurs sanctionnent-ils vraiment ?
 
-*Projet de data science sur les maires visés par une affaire judiciaire et leur
-réélection aux municipales de 2020 et 2026.*
+*Projet de Ruben Saada Dos Santos et Quentin Nosmas, ENSAE 2A, cours « Python pour la
+data science ». Les maires visés par une affaire judiciaire et leur réélection aux
+municipales de 2020 et 2026.*
 
 ## Question
 
