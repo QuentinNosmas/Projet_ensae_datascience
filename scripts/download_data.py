@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import codecs
 import csv
+import gzip
 import hashlib
 import json
 import logging
@@ -43,6 +44,11 @@ MANIFEST_PATH = ROOT / "data" / "MANIFEST.json"
 # Instantanés versionnés des sources mises à jour en continu (bases d'affaires) :
 # sans eux, les résultats changeraient d'un jour à l'autre. --live les ignore.
 SNAPSHOT_DIR = ROOT / "data" / "snapshots"
+# Copies de secours : si une URL officielle disparaît, on cherche une copie du même
+# fichier sur Internet Archive, acceptée seulement si son empreinte SHA-256 est celle
+# du manifeste (voir telecharger_avec_secours).
+WAYBACK_DISPONIBLE = "https://archive.org/wayback/available"
+WAYBACK = "https://web.archive.org/web/{horodatage}id_/{url}"
 
 USER_AGENT = "Projet-probite-maires/1.0 (projet personnel de data science; python-requests)"
 TIMEOUT = (15, 120)  # (connexion, lecture) en secondes
@@ -61,32 +67,46 @@ DGF = "https://static.data.gouv.fr/resources"
 # --------------------------------------------------------------------------
 # Sources. format : csv | txt | xls | zip | geojson.gz | json
 # --------------------------------------------------------------------------
+# URL officielles retirées depuis (404), réutilisées pour leurs copies archivées.
+URL_MUNI2014_T1_MOINS1000 = "https://www.data.gouv.fr/storage/f/2014-03-25T16-08-50/muni-2014-resultats-com-moins-1000-t1.txt"
+URL_MUNI2014_T1_1000PLUS = "https://www.data.gouv.fr/storage/f/2014-03-25T16-06-23/muni-2014-resultats-com-1000-et-plus-t1.txt"
+URL_MUNI2014_T2_MOINS1000 = "https://www.data.gouv.fr/storage/f/2014-03-31T09-51-08/muni-2014-resultats-com-moins-1000-t2.txt"
+URL_MUNI2014_T2_1000PLUS = "https://www.data.gouv.fr/storage/f/2014-03-31T09-49-28/muni-2014-resultats-com-1000-et-plus-t2.txt"
+URL_RNE_MAIRES = f"{DGF}/repertoire-national-des-elus-1/20260811-155100/elus-maire-mai.csv"
 SOURCES: dict[str, dict[str, str]] = {
     # 1. Résultats des municipales par commune --------------------------------
     # Producteur : Ministère de l'Intérieur, data.gouv.fr. Licence : Licence Ouverte.
     "muni2014_t1_moins1000": {
-        "url": "https://www.data.gouv.fr/storage/f/2014-03-25T16-08-50/muni-2014-resultats-com-moins-1000-t1.txt",
+        "url": URL_MUNI2014_T1_MOINS1000,
         "filename": "muni2014_t1_moins1000.txt",
         "format": "txt",
         "producer": MI,
+        # Retiré de data.gouv.fr (404) : copie identique sur Internet Archive.
+        "miroirs": [WAYBACK.format(horodatage="20260322174641", url=URL_MUNI2014_T1_MOINS1000)],
     },
     "muni2014_t1_1000plus": {
-        "url": "https://www.data.gouv.fr/storage/f/2014-03-25T16-06-23/muni-2014-resultats-com-1000-et-plus-t1.txt",
+        "url": URL_MUNI2014_T1_1000PLUS,
         "filename": "muni2014_t1_1000plus.txt",
         "format": "txt",
         "producer": MI,
+        # Retiré de data.gouv.fr (404) : copie identique sur Internet Archive.
+        "miroirs": [WAYBACK.format(horodatage="20260921141309", url=URL_MUNI2014_T1_1000PLUS)],
     },
     "muni2014_t2_moins1000": {
-        "url": "https://www.data.gouv.fr/storage/f/2014-03-31T09-51-08/muni-2014-resultats-com-moins-1000-t2.txt",
+        "url": URL_MUNI2014_T2_MOINS1000,
         "filename": "muni2014_t2_moins1000.txt",
         "format": "txt",
         "producer": MI,
+        # Retiré de data.gouv.fr (404) : copie identique sur Internet Archive.
+        "miroirs": [WAYBACK.format(horodatage="20260322174641", url=URL_MUNI2014_T2_MOINS1000)],
     },
     "muni2014_t2_1000plus": {
-        "url": "https://www.data.gouv.fr/storage/f/2014-03-31T09-49-28/muni-2014-resultats-com-1000-et-plus-t2.txt",
+        "url": URL_MUNI2014_T2_1000PLUS,
         "filename": "muni2014_t2_1000plus.txt",
         "format": "txt",
         "producer": MI,
+        # Retiré de data.gouv.fr (404) : copie identique sur Internet Archive.
+        "miroirs": [WAYBACK.format(horodatage="20260921141307", url=URL_MUNI2014_T2_1000PLUS)],
     },
     "muni2020_t1_moins1000": {
         "url": f"{DGF}/elections-municipales-2020-resultats/20200525-133805/2020-05-18-resultats-communes-de-moins-de-1000.txt",
@@ -129,10 +149,12 @@ SOURCES: dict[str, dict[str, str]] = {
     # 2. Maires ----------------------------------------------------------------
     # Répertoire national des élus. Licence Ouverte v2.0. Instantané à la date de MAJ.
     "rne_maires": {
-        "url": f"{DGF}/repertoire-national-des-elus-1/20260811-155100/elus-maire-mai.csv",
+        "url": URL_RNE_MAIRES,
         "filename": "rne_maires.csv",
         "format": "csv",
         "producer": MI,
+        # Retiré de data.gouv.fr (404) : copie identique sur Internet Archive.
+        "miroirs": [WAYBACK.format(horodatage="20260825000954", url=URL_RNE_MAIRES)],
     },
     # Maires sortants avant le scrutin de 2026. Licence Ouverte v2.0.
     "muni2026_maires_sortants": {
@@ -476,6 +498,10 @@ def download(url: str, dest: Path, session: requests.Session, name: str, is_zip:
             os.replace(tmp, dest)
             return
         except (requests.RequestException, OSError) as exc:
+            reponse = getattr(exc, "response", None)
+            if reponse is not None and 400 <= reponse.status_code < 500 and reponse.status_code not in (408, 429):
+                tmp.unlink(missing_ok=True)
+                raise  # fichier absent ou refusé : réessayer ne changera rien
             if tmp.exists() and tmp.stat().st_size > debut:
                 attempt = 0  # le transfert avance : on continue sans entamer le quota d'essais
             elif attempt >= MAX_RETRIES:
@@ -557,6 +583,79 @@ def is_valid(name: str, src: dict[str, str], manifest: dict[str, Any]) -> bool:
     return True
 
 
+def copie_archivee(url: str, date: str, session: requests.Session) -> str | None:
+    """URL brute de la copie d'Internet Archive la plus proche de ``date`` (AAAAMMJJ)."""
+    try:
+        r = session.get(WAYBACK_DISPONIBLE, params={"url": url, "timestamp": date}, timeout=TIMEOUT)
+        r.raise_for_status()
+        copie = r.json().get("archived_snapshots", {}).get("closest")
+    except (requests.RequestException, ValueError):
+        return None
+    if not copie or copie.get("status") != "200":
+        return None
+    return WAYBACK.format(horodatage=copie["timestamp"], url=url)
+
+
+def empreinte_attendue(dest: Path, attendu: str) -> bool:
+    """Le fichier a-t-il l'empreinte attendue ? Internet Archive sert parfois le fichier
+    compressé en gzip : on le décompresse alors avant de comparer."""
+    if sha256sum(dest) == attendu:
+        return True
+    with dest.open("rb") as fh:
+        if fh.read(2) != b"\x1f\x8b":
+            return False
+    decompresse = dest.with_name(dest.name + ".gunzip")
+    try:
+        with gzip.open(dest, "rb") as entree, decompresse.open("wb") as sortie:
+            shutil.copyfileobj(entree, sortie)
+    except (OSError, EOFError):
+        decompresse.unlink(missing_ok=True)
+        return False
+    if sha256sum(decompresse) == attendu:
+        os.replace(decompresse, dest)
+        return True
+    decompresse.unlink(missing_ok=True)
+    return False
+
+
+def telecharger_avec_secours(name: str, src: dict[str, Any], dest: Path, session: requests.Session,
+                             manifest: dict[str, Any]) -> str:
+    """Télécharge depuis l'URL officielle ; si elle a disparu, depuis une copie archivée.
+
+    Une copie n'est acceptée que si son empreinte SHA-256 est celle enregistrée au
+    manifeste : on obtient exactement le fichier utilisé pour l'étude, ou rien.
+    Renvoie l'URL effectivement utilisée.
+    """
+    is_zip = src["format"] == "zip"
+    try:
+        download(src["url"], dest, session, name, is_zip=is_zip)
+        return src["url"]
+    except (requests.RequestException, OSError) as echec:
+        attendu = manifest.get(name, {}).get("sha256")
+        if attendu is None:
+            raise  # pas d'empreinte de référence : impossible de valider une copie
+        date = manifest[name].get("downloaded_at", "")[:10].replace("-", "")
+        miroirs = list(src.get("miroirs", []))
+        archive = copie_archivee(src["url"], date, session)
+        if archive and archive not in miroirs:
+            miroirs.append(archive)
+        for miroir in miroirs:
+            log.warning("%s : URL officielle indisponible (%s), essai de la copie %s", name, echec, miroir)
+            try:
+                download(miroir, dest, session, name)
+            except (requests.RequestException, OSError) as exc:
+                log.warning("%s : copie indisponible (%s)", name, exc)
+                continue
+            if empreinte_attendue(dest, attendu):
+                if is_zip:
+                    check_zip(dest)
+                log.info("%s : copie archivée identique au fichier d'origine (SHA-256 vérifié)", name)
+                return miroir
+            log.warning("%s : la copie n'a pas l'empreinte attendue, ignorée", name)
+            dest.unlink(missing_ok=True)
+        raise
+
+
 def process(name: str, src: dict[str, str], session: requests.Session,
             manifest: dict[str, Any], force: bool, live: bool = False) -> bool:
     dest = RAW_DIR / src["filename"]
@@ -571,7 +670,7 @@ def process(name: str, src: dict[str, str], session: requests.Session,
         shutil.copyfile(snapshot, dest)
     else:
         log.info("%s : téléchargement de %s", name, src["url"])
-        download(src["url"], dest, session, name, is_zip=src["format"] == "zip")
+        telecharger_avec_secours(name, src, dest, session, manifest)
     if dest.stat().st_size == 0:
         raise ValueError(f"{name} : fichier téléchargé vide")
 
