@@ -14,7 +14,9 @@ Il n'existe pas d'open data officiel nominatif sur les procédures visant des
    de naissance ou par le nom de la commune cité dans sa fiche (homonymes) ;
 3. pour chaque ligne du panel (sortant x élection), dater les affaires par
    rapport au 1er tour : connue avant le scrutin, révélée pendant le mandat
-   sortant, ou seulement après (ces dernières servent de groupe placebo).
+   sortant, ou seulement après (ces dernières servent de groupe placebo) ;
+4. grader les affaires connues au vote selon leur stade à cette date :
+   soupçon, procédure judiciaire, condamnation, ou élu déjà blanchi.
 
 Date « publique » d'une affaire : date de début de la procédure si elle est
 connue, sinon date du verdict (Poligraph) ; date de condamnation (Casier
@@ -59,6 +61,15 @@ STATUTS_ABANDON = {
     "INSTRUCTION_CLOTUREE_SANS_MISE_EN_EXAMEN",
 }  # tout le reste : procédure en cours
 
+# Gradation de l'affaire au moment du vote (voir ``niveau_au_vote``).
+NIVEAUX = {1: "soupçon", 2: "procédure judiciaire", 3: "condamnation"}
+# Statuts sans saisine d'un juge : signalement, plainte, enquête du parquet, et
+# leurs issues sans procès (classement, prescription).
+STATUTS_SOUPCON = {
+    "SIGNALEMENT_PARQUET", "PLAINTE_DEPOSEE", "ENQUETE_PRELIMINAIRE",
+    "CLASSEMENT_SANS_SUITE", "PRESCRIPTION",
+}
+
 
 def _issue(statut_code: pd.Series) -> pd.Series:
     issue = pd.Series("en_cours", index=statut_code.index, dtype="string")
@@ -89,8 +100,10 @@ def affaires_casier() -> pd.DataFrame:
         "categorie": c["categories"],
         "probite": c["categories"].str.split("; ").map(lambda cs: bool(set(cs) & PROBITE_CASIER)),
         "issue": "condamnation",
+        "statut_code": "CONDAMNATION",
         "date_publique": c["date_condamnation"],
         "date_condamnation": c["date_condamnation"],
+        "date_verdict": c["date_condamnation"],
         "liee_au_mandat": pd.NA,
         "texte": _texte(c["affaire"], c["description"]),
     })
@@ -107,8 +120,10 @@ def affaires_poligraph() -> pd.DataFrame:
         "categorie": a["categorie"],
         "probite": a["categorie_code"].isin(PROBITE_POLIGRAPH),
         "issue": issue,
+        "statut_code": a["statut_code"],
         "date_publique": a["date_debut"].fillna(a["date_verdict"]),
         "date_condamnation": a["date_verdict"].where(issue == "condamnation"),
+        "date_verdict": a["date_verdict"],
         "liee_au_mandat": a["liee_au_mandat"].map({"oui": True, "non": False}),
         "texte": _texte(a["titre"], a["description"]),
     })
@@ -248,9 +263,43 @@ def dater(aff: pd.DataFrame) -> pd.DataFrame:
     aff.loc[d.notna() & (d >= vote), "moment"] = "apres_scrutin"
     aff.loc[ambigue, "moment"] = "ambigue"
     aff.loc[d.isna(), "moment"] = "sans_date"
-    cond = aff["date_condamnation"]
-    aff["condamne_avant"] = cond.notna() & (cond < vote) & ~(~_date_precise(cond) & (cond.dt.year == vote.dt.year))
+    aff["condamne_avant"] = _avant_vote(aff["date_condamnation"], vote)
+    aff["niveau_vote"], aff["blanchi_avant"] = niveau_au_vote(aff, vote)
     return aff
+
+
+def _avant_vote(d: pd.Series, vote: pd.Series) -> pd.Series:
+    """Date certainement antérieure au 1er tour (une année seule, celle du vote, ne l'est pas)."""
+    return d.notna() & (d < vote) & ~(~_date_precise(d) & (d.dt.year == vote.dt.year))
+
+
+def niveau_au_vote(aff: pd.DataFrame, vote: pd.Series) -> tuple[pd.Series, pd.Series]:
+    """Stade de l'affaire au 1er tour : (niveau 1 à 3, blanchi avant le vote).
+
+    Les sources ne donnent que le statut **actuel** de l'affaire, pas son
+    historique. On reconstruit le stade au vote avec la date du verdict :
+
+    - 3 « condamnation » : condamnation (même non définitive) prononcée avant le vote ;
+    - 1 « soupçon » : pas de juge saisi (signalement, plainte, enquête du parquet,
+      classement sans suite ou prescription non encore prononcés au vote) ;
+    - 2 « procédure judiciaire » : tout le reste, c'est-à-dire une mise en examen,
+      une instruction ou un procès en cours, ou une affaire jugée seulement après
+      le vote ;
+    - blanchi : relaxe, non-lieu, classement ou prescription prononcés avant le vote
+      (pas de niveau : NA).
+
+    Approximation prudente : une affaire jugée après le vote est classée au
+    niveau 2, alors qu'elle n'était peut-être qu'au stade de l'enquête ; et une
+    condamnation en appel postérieure au vote fait oublier une éventuelle
+    condamnation de 1re instance antérieure (niveau 2 au lieu de 3).
+    """
+    verdict_avant = _avant_vote(aff["date_verdict"], vote)
+    niveau = pd.Series(2, index=aff.index, dtype="Int64")
+    niveau[aff["statut_code"].isin(STATUTS_SOUPCON)] = 1
+    niveau[(aff["issue"] == "condamnation") & verdict_avant] = 3
+    blanchi = (aff["issue"] == "abandon") & verdict_avant
+    niveau[blanchi] = pd.NA
+    return niveau, blanchi
 
 
 def variables_traitement(aff_sortants: pd.DataFrame) -> pd.DataFrame:
@@ -267,9 +316,19 @@ def variables_traitement(aff_sortants: pd.DataFrame) -> pd.DataFrame:
         "affaire_apres": a["moment"] == "apres_scrutin",
         "affaire_ambigue": a["moment"].isin(["ambigue", "sans_date"]),
     })
+    cle = [a["annee"], a["code_insee"]]
     out = flags.groupby(["annee", "code_insee"]).any()
-    out["n_affaires_connues"] = connue.groupby([a["annee"], a["code_insee"]]).sum()
-    out["premiere_affaire"] = a["date_publique"].where(connue).groupby([a["annee"], a["code_insee"]]).min()
+    out["n_affaires_connues"] = connue.groupby(cle).sum()
+    out["premiere_affaire"] = a["date_publique"].where(connue).groupby(cle).min()
+
+    # Gradation : stade le plus avancé parmi les affaires connues au vote (0 = aucune
+    # affaire active). Un sortant n'est « blanchi » que si toutes ses affaires connues
+    # se sont soldées par une relaxe, un non-lieu ou un classement avant le vote.
+    niveau = a["niveau_vote"].where(connue).groupby(cle).max().fillna(0).astype(int)
+    out["affaire_niveau"] = niveau
+    for n, nom in ((1, "soupcon"), (2, "procedure"), (3, "condamnation")):
+        out[f"affaire_{nom}"] = niveau == n
+    out["affaire_blanchi"] = (connue & a["blanchi_avant"]).groupby(cle).any() & (niveau == 0)
     return out.reset_index()
 
 
@@ -282,10 +341,12 @@ def build() -> tuple[pd.DataFrame, pd.DataFrame]:
 
     traite = variables_traitement(aff_sortants)
     p = panel.merge(traite, on=["annee", "code_insee"], how="left")
-    bool_cols = [c for c in traite.columns if c not in ("annee", "code_insee", "n_affaires_connues", "premiere_affaire")]
+    compteurs = ("n_affaires_connues", "affaire_niveau")
+    bool_cols = [c for c in traite.columns if c not in ("annee", "code_insee", "premiere_affaire", *compteurs)]
     for c in bool_cols:
         p[c] = p[c].astype("boolean").fillna(False)
-    p["n_affaires_connues"] = p["n_affaires_connues"].fillna(0).astype("Int64")
+    for c in compteurs:
+        p[c] = p[c].fillna(0).astype("Int64")
     p["personnalite_affaires"] = pd.MultiIndex.from_frame(p[["annee", "code_insee"]]).isin(
         pd.MultiIndex.from_frame(ok[["annee", "code_insee"]]))
     return p, aff_sortants
@@ -299,6 +360,8 @@ def main() -> int:
     cols = ["personnalite_affaires", "affaire_connue", "affaire_mandat", "affaire_probite_mandat",
             "condamne_avant", "affaire_apres", "affaire_ambigue"]
     log.info("sortants concernés par élection :\n%s", p.groupby("annee")[cols].sum().to_string())
+    gradation = ["affaire_soupcon", "affaire_procedure", "affaire_condamnation", "affaire_blanchi"]
+    log.info("stade de l'affaire au vote :\n%s", p.groupby("annee")[gradation].sum().to_string())
     return 0
 
 

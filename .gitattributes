@@ -1,0 +1,3 @@
+# Instantanés de données : octets versionnés tels quels (pas de conversion des
+# fins de ligne), pour que leur empreinte SHA-256 corresponde à data/MANIFEST.json.
+data/snapshots/** -text
