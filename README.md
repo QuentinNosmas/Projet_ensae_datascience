@@ -71,7 +71,9 @@ une page Wikipédia ou une fiche Poligraph : les résultats valent pour les mair
 villes moyennes et grandes, pas pour les petites communes. Avec quelques dizaines
 de cas, seul un effet important serait détectable.
 
-Le détail est dans [`notebooks/00_synthese.ipynb`](notebooks/00_synthese.ipynb).
+Le résumé complet, avec tous les tableaux et figures, se lit directement sur GitHub dans
+[`RESULTATS.md`](RESULTATS.md) (généré par `python main.py --markdown`) ; le détail des
+analyses est dans [`notebooks/00_synthese.ipynb`](notebooks/00_synthese.ipynb).
 
 ## Reproduire les résultats
 
@@ -96,6 +98,7 @@ pip install -r requirements.txt
 python main.py                    # toute la chaîne + résumé détaillé dans le terminal
 python main.py --figures          # + figures dans sorties/figures/
 python main.py --cache            # réutilise les tables déjà construites (plus rapide)
+python main.py --markdown         # écrit le résumé dans RESULTATS.md (figures : docs/resultats/)
 ```
 
 `main.py` enchaîne données, panel, affaires, contexte des communes et modèles, puis
@@ -159,6 +162,7 @@ peuvent alors changer).
 | Fichier | Rôle |
 |---|---|
 | `main.py` | point d'entrée : toute la chaîne et un résumé détaillé des résultats |
+| `RESULTATS.md` | ce résumé, lisible sur GitHub (régénéré par `python main.py --markdown`) |
 | `scripts/download_data.py` | téléchargement reproductible des sources (reprise, contrôles) |
 | `scripts/figures.py` | export des figures du README depuis les notebooks exécutés |
 | `src/load.py` | lecture et nettoyage de chaque source, codes INSEE harmonisés |

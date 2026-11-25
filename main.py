@@ -18,7 +18,9 @@ Usage :
   python main.py --cache              # réutiliser les tables déjà construites
   python main.py --figures            # enregistrer aussi les figures (sorties/figures/)
   python main.py --figures mon_dossier
-  python main.py > resume.txt         # garder le résumé dans un fichier
+  python main.py --markdown           # écrire le résumé dans RESULTATS.md (lisible sur
+                                      # GitHub), figures dans docs/resultats/
+  python main.py > resume.txt         # garder le résumé du terminal dans un fichier
 
 Premier lancement : environ 550 Mo à télécharger (de 30 minutes à 1 heure).
 Ensuite : 2 à 3 minutes.
@@ -27,20 +29,26 @@ Ensuite : 2 à 3 minutes.
 from __future__ import annotations
 
 import argparse
+import datetime
 import logging
+import os
 import sys
 import textwrap
 import time
 import warnings
 from pathlib import Path
 
+import matplotlib
 import numpy as np
 import pandas as pd
+
+matplotlib.use("Agg")  # figures écrites dans des fichiers, jamais affichées
 
 ROOT = Path(__file__).resolve().parent
 sys.path.insert(0, str(ROOT / "src"))
 import affaires as A  # noqa: E402
 import covariables as Cov  # noqa: E402
+import graphiques as G  # noqa: E402
 import modeles as M  # noqa: E402
 import panel as P  # noqa: E402
 
@@ -53,28 +61,142 @@ pd.set_option("display.max_colwidth", 40)
 # --------------------------------------------------------------------------
 # Mise en forme du résumé
 # --------------------------------------------------------------------------
+class Rendu:
+    """Destination du résumé : le terminal (texte justifié) ou un fichier Markdown,
+    que GitHub affiche avec titres, tableaux et figures."""
+
+    def __init__(self, markdown: Path | None = None, figures: Path | None = None):
+        self.markdown = markdown
+        self.figures = figures
+        self.lignes: list[str] = []
+
+    def ecrire(self, ligne: str = "") -> None:
+        if self.markdown is None:
+            print(ligne)
+        else:
+            self.lignes.append(ligne)
+
+    def enregistrer(self) -> None:
+        if self.markdown is not None:
+            self.markdown.write_text("\n".join(self.lignes).strip() + "\n", encoding="utf-8")
+
+
+R = Rendu()  # remplacé dans main() selon les options
+
+
 def titre(texte: str) -> None:
-    print("\n" + "=" * LARGEUR + f"\n{texte.upper()}\n" + "=" * LARGEUR)
+    if R.markdown is None:
+        R.ecrire("\n" + "=" * LARGEUR + f"\n{texte.upper()}\n" + "=" * LARGEUR)
+    else:
+        R.ecrire(f"\n## {texte}")
 
 
 def sous_titre(texte: str) -> None:
-    print(f"\n--- {texte} " + "-" * max(0, LARGEUR - len(texte) - 5))
+    if R.markdown is None:
+        R.ecrire(f"\n--- {texte} " + "-" * max(0, LARGEUR - len(texte) - 5))
+    else:
+        R.ecrire(f"\n### {texte[0].upper()}{texte[1:]}")
 
 
 INSECABLE = {" :": "\u00a0:", " ;": "\u00a0;", " %": "\u00a0%", "« ": "«\u00a0", " »": "\u00a0»"}
 
 
 def texte(*paragraphes: str) -> None:
-    """Paragraphes justifiés à LARGEUR, sans retour à la ligne avant « : », « ; », « % »."""
+    """Paragraphes : justifiés à LARGEUR dans le terminal (sans retour à la ligne avant
+    « : », « ; », « % »), d'un seul tenant en Markdown."""
     for p in paragraphes:
         p = " ".join(p.split())
+        if R.markdown is not None:
+            R.ecrire("\n" + p)
+            continue
         for espace, insecable in INSECABLE.items():
             p = p.replace(espace, insecable)
-        print("\n" + textwrap.fill(p, LARGEUR).replace("\u00a0", " "))
+        R.ecrire("\n" + textwrap.fill(p, LARGEUR).replace("\u00a0", " "))
+
+
+# Noms lisibles des variables, dans les en-têtes et l'index des tableaux.
+LIBELLES = {
+    "effectif": "effectif", "sortants": "sortants", "dont_2026": "dont 2026",
+    "inscrits": "inscrits (médiane)", "inscrits_median": "inscrits (médiane)", "listes": "listes",
+    "score_precedent": "score précédent (%)", "evolution_score": "évolution du score (pts)",
+    "victoire": "victoire (%)", "victoire_pct": "victoire (%)",
+    "effet": "effet", "ic_bas": "IC bas", "ic_haut": "IC haut", "coef": "coef.", "p": "p",
+    "affaire_gauche": "affaire, sortant de gauche", "affaire_droite": "affaire, sortant de droite",
+    "affaire_autre": "affaire, autre bord", "personnalite_affaires": "notoriété (personnalité recensée)",
+    "affaire_niveau": "stade de l'affaire (0 à 3)", "affaire_blanchi": "élu déjà blanchi",
+    "affaire_avant_jugement": "affaire pas encore jugée", "affaire_condamnation": "condamnation avant le vote",
+    "ecart_gauche_droite": "écart gauche - droite", "condamnation_moins_avant_jugement":
+        "condamnation - pas encore jugée",
+    "camp": "bord", "stade": "stade de l'affaire au vote", "groupe": "groupe", "annee": "élection",
+}
+
+
+def _libelle(v: object) -> str:
+    if isinstance(v, tuple):
+        return " / ".join(_libelle(x) for x in v)
+    return LIBELLES.get(v, str(v)) if isinstance(v, str) else str(v)
+
+
+def _lisible(df: pd.DataFrame) -> pd.DataFrame:
+    """Remplace les noms de variables par des libellés (colonnes, index et leurs noms)."""
+    df = df.copy()
+    df.columns = df.columns.map(lambda c: tuple(_libelle(x) for x in c) if isinstance(c, tuple) else _libelle(c))
+    df.columns.names = [_libelle(n) if n else n for n in df.columns.names]
+    df.index = df.index.map(lambda i: tuple(_libelle(x) for x in i) if isinstance(i, tuple) else _libelle(i))
+    df.index.names = [_libelle(n) if n else n for n in df.index.names]
+    return df
+
+
+def _cellule(v: object, decimales: int) -> str:
+    if isinstance(v, (bool, np.bool_)):
+        return "oui" if v else "non"
+    if isinstance(v, (int, np.integer)):
+        return nombre(v, 0)
+    if isinstance(v, (float, np.floating)):
+        if np.isnan(v):
+            return ""
+        return nombre(v, 0 if abs(v) >= 1000 else decimales)
+    return str(v)
+
+
+def _markdown(df: pd.DataFrame, decimales: int) -> str:
+    """Table Markdown : index et colonnes à plusieurs niveaux aplatis, nombres à la française."""
+    joindre = lambda v: " / ".join(map(str, v)) if isinstance(v, tuple) else str(v)
+    entete = [" / ".join(n for n in df.index.names if n)]
+    entete += [joindre(c) for c in df.columns]
+    lignes = ["| " + " | ".join(entete) + " |", "|" + "---|" * len(entete)]
+    for idx, ligne in df.iterrows():
+        etiquette = joindre(idx)
+        # Lignes « dont » : retrait conservé (espaces insécables, que GitHub affiche).
+        retrait = len(etiquette) - len(etiquette.lstrip())
+        cellules = ["&nbsp;" * 2 * retrait + etiquette.strip()] + [_cellule(v, decimales) for v in ligne]
+        lignes.append("| " + " | ".join(c.replace("|", "/") for c in cellules) + " |")
+    return "\n".join(lignes)
 
 
 def tableau(df: pd.DataFrame | pd.Series, decimales: int = 1) -> None:
-    print("\n" + textwrap.indent(df.round(decimales).to_string(), "  "))
+    df = _lisible(df.to_frame() if isinstance(df, pd.Series) else df)
+    if R.markdown is None:
+        R.ecrire("\n" + textwrap.indent(df.round(decimales).to_string(), "  "))
+    else:
+        R.ecrire("\n" + _markdown(df, decimales))
+
+
+def figure(nom: str, tracer, legende: str) -> None:
+    """Trace une figure si un dossier de figures est demandé ; en Markdown, l'insère."""
+    if R.figures is None:
+        return
+    import matplotlib.pyplot as plt  # noqa: PLC0415
+
+    chemin = R.figures / nom
+    fig = tracer()
+    fig.savefig(chemin, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    if R.markdown is None:
+        R.ecrire(f"\n  [figure] {chemin.relative_to(ROOT).as_posix() if chemin.is_relative_to(ROOT) else chemin}")
+    else:
+        lien = Path(os.path.relpath(chemin, R.markdown.parent)).as_posix()
+        R.ecrire(f"\n![{legende}]({lien})\n\n*{legende}*")
 
 
 def nombre(x: float, decimales: int = 1, signe: bool = False) -> str:
@@ -124,7 +246,10 @@ def construire(cache: bool) -> dict:
     les tables dérivées (panel, affaires, covariables) sont reconstruites, sauf
     avec ``cache`` si elles existent déjà.
     """
-    titre("Construction des données")
+    if R.markdown is None:
+        titre("Construction des données")
+    else:
+        print("Construction des données :")
     sortie = {}
     with Chrono("panel maire sortant x élection (municipales 2014, 2020, 2026)"):
         sortie["panel_sortants"] = P.load_panel() if cache else P.write_panel()
@@ -201,6 +326,8 @@ def section_donnees(b: dict) -> None:
         « connue au vote » si cette date précède le 1er tour, « révélée pendant le mandat »
         si elle tombe entre les deux élections.""",
     )
+    figure("chronologie_affaires.png", lambda: G.chronologie_affaires(b["aff"]),
+           "Affaires rattachées aux maires sortants, selon leur date et leur issue actuelle")
 
 
 def section_reference(b: dict) -> None:
@@ -235,6 +362,8 @@ def section_profil(b: dict) -> None:
                    listes=("n_listes", "mean"), score_precedent=("pct_voix_exp_prec", "mean"),
                    evolution_score=("delta_pct_voix_exp", "mean"), victoire_pct=("gagne", "mean")))
     profil["victoire_pct"] *= 100
+    figure("carte.png", lambda: G.carte_affaires(b["panel"]),
+           "Sortants dont une affaire était connue au moment du vote, selon l'issue du scrutin")
     tableau(profil)
     aff, autres, futur = (profil.loc[g] for g in
                           ("affaire connue au vote", "autres sortants", "personnalité, affaire future"))
@@ -244,16 +373,24 @@ def section_profil(b: dict) -> None:
         {nombre(autres.inscrits_median, 0)}), avec plus de listes en compétition, et avaient
         été moins bien élus la fois précédente ({nombre(aff.score_precedent, 0)} % contre
         {nombre(autres.score_precedent, 0)} %).""",
+    )
+    texte(
         f"""Premier piège, le retour vers la moyenne : un sortant très bien élu a plus à
         perdre. Les sortants avec affaire partaient de plus bas ; ils reculent donc moins (évolution
         moyenne du score de {nombre(aff.evolution_score, signe=True)} contre
         {nombre(autres.evolution_score, signe=True)} points) sans que l'affaire y soit pour rien. Il
         faut contrôler le score précédent.""",
+    )
+    figure("retour_moyenne.png", lambda: G.retour_moyenne(d),
+           "Retour vers la moyenne : évolution du score selon le score précédent")
+    texte(
         f"""Second piège, la notoriété : les personnalités dont l'affaire n'éclatera qu'après
         le vote leur ressemblent beaucoup, mais gagnent {nombre(futur.victoire_pct, 0)} % du
         temps, contre {nombre(autres.victoire_pct, 0)} % pour les sortants ordinaires. Les élus
         assez connus pour figurer dans nos sources bénéficient d'une prime électorale.""",
     )
+    figure("victoire_par_groupe.png", lambda: G.victoire_par_groupe(d),
+           "Taux de victoire selon la notoriété et le stade de l'affaire")
 
 
 def section_approches(b: dict) -> pd.DataFrame:
@@ -271,6 +408,9 @@ def section_approches(b: dict) -> pd.DataFrame:
     )
     res = M.effets_par_approche(b["d"])
     tableau(res)
+    figure("estimations.png",
+           lambda: G.estimations(res, "Effet d'une affaire révélée pendant le mandat, selon l'approche"),
+           "Effet d'une affaire révélée pendant le mandat, selon l'approche (IC 95 %)")
     score, victoire = res["Évolution du score"], res["Probabilité de victoire"]
     contient_zero = ((score["ic_bas"] <= 0) & (score["ic_haut"] >= 0)).all()
     notoriete = victoire.loc[M.APPROCHES[3]]
@@ -384,33 +524,6 @@ def section_conclusion(res: pd.DataFrame) -> None:
 
 
 # --------------------------------------------------------------------------
-# Figures
-# --------------------------------------------------------------------------
-def figures(b: dict, res: pd.DataFrame, dossier: Path) -> None:
-    import matplotlib
-
-    matplotlib.use("Agg")
-    import graphiques as G  # noqa: PLC0415 (import après le choix du moteur graphique)
-
-    titre("Figures")
-    G.style()
-    dossier.mkdir(parents=True, exist_ok=True)
-    a_tracer = {
-        "carte.png": lambda: G.carte_affaires(b["panel"]),
-        "estimations.png": lambda: G.estimations(res, "Effet d'une affaire révélée pendant le mandat, selon l'approche"),
-        "retour_moyenne.png": lambda: G.retour_moyenne(b["d"]),
-        "victoire_par_groupe.png": lambda: G.victoire_par_groupe(b["d"]),
-        "chronologie_affaires.png": lambda: G.chronologie_affaires(b["aff"]),
-    }
-    for nom, tracer in a_tracer.items():
-        fig = tracer()
-        fig.savefig(dossier / nom, dpi=150, bbox_inches="tight")
-        matplotlib.pyplot.close(fig)
-        chemin = dossier / nom
-        print(f"  {chemin.relative_to(ROOT).as_posix() if chemin.is_relative_to(ROOT) else chemin.as_posix()}")
-
-
-# --------------------------------------------------------------------------
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0],
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -418,7 +531,17 @@ def main(argv: list[str] | None = None) -> int:
                    help="réutiliser le panel et les covariables déjà construits (plus rapide)")
     p.add_argument("--figures", nargs="?", const="sorties/figures", metavar="DOSSIER",
                    help="enregistrer aussi les figures (par défaut : sorties/figures)")
+    p.add_argument("--markdown", nargs="?", const="RESULTATS.md", metavar="FICHIER",
+                   help="écrire le résumé en Markdown (par défaut : RESULTATS.md, figures dans "
+                        "docs/resultats/) au lieu de l'afficher")
     args = p.parse_args(argv)
+    global R
+    markdown = (ROOT / args.markdown).resolve() if args.markdown else None
+    dossier = args.figures or ("docs/resultats" if markdown else None)
+    R = Rendu(markdown, (ROOT / dossier).resolve() if dossier else None)
+    if R.figures is not None:
+        R.figures.mkdir(parents=True, exist_ok=True)
+        G.style()
     # Le détail technique (téléchargements, nettoyage) reste dans les journaux, pas dans le résumé.
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s : %(message)s")
     warnings.filterwarnings("ignore", category=FutureWarning)
@@ -427,6 +550,12 @@ def main(argv: list[str] | None = None) -> int:
     print("LES ÉLECTEURS SANCTIONNENT-ILS LES MAIRES VISÉS PAR UNE AFFAIRE JUDICIAIRE ?")
     print("Municipales 2020 et 2026 - résumé de l'étude")
     b = construire(args.cache)
+    if markdown is not None:
+        R.ecrire("# Les électeurs sanctionnent-ils les maires visés par une affaire judiciaire ?")
+        R.ecrire(f"\n*Municipales 2020 et 2026 : résumé de l'étude. Fichier généré par "
+                 f"`python main.py --markdown` le {datetime.date.today():%d/%m/%Y}, à partir des "
+                 f"données et du code du dépôt ; ne pas le modifier à la main. Détail des "
+                 f"analyses : [notebooks/](notebooks/).*")
     section_question()
     section_donnees(b)
     section_reference(b)
@@ -436,8 +565,10 @@ def main(argv: list[str] | None = None) -> int:
     section_stade(b)
     section_robustesse(b)
     section_conclusion(res)
-    if args.figures:
-        figures(b, res, (ROOT / args.figures).resolve())
+    R.enregistrer()
+    if markdown is not None:
+        print(f"Résumé écrit dans {markdown.relative_to(ROOT).as_posix()}, "
+              f"figures dans {R.figures.relative_to(ROOT).as_posix()}/")
     print(f"\nTerminé en {time.perf_counter() - debut:.0f} s. Détail : notebooks/00_synthese.ipynb à 04.")
     return 0
 
