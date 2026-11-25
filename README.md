@@ -150,3 +150,8 @@ même façon, de bout en bout :
 Il n'existe pas de base officielle nominative des procédures visant des élus : les deux
 bases d'affaires sont des initiatives citoyennes, dont on utilise un instantané daté
 (`data/snapshots/`).
+
+`data/MANIFEST.json` garde l'URL et l'empreinte SHA-256 de chaque fichier utilisé. Si une
+source officielle disparaît (c'est le cas des résultats de 2014 et du Répertoire national
+des élus d'août 2026, retirés de data.gouv.fr), le téléchargement se rabat sur une copie
+d'Internet Archive, acceptée seulement si son empreinte est identique à l'originale.
