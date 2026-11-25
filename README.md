@@ -90,7 +90,20 @@ source .venv/bin/activate          # Windows (PowerShell) : .venv\Scripts\activa
 pip install -r requirements.txt
 ```
 
-**2. Exécuter les notebooks**
+**2. Obtenir le résumé de l'étude**
+
+```bash
+python main.py                    # toute la chaîne + résumé détaillé dans le terminal
+python main.py --figures          # + figures dans sorties/figures/
+python main.py --cache            # réutilise les tables déjà construites (plus rapide)
+```
+
+`main.py` enchaîne données, panel, affaires, contexte des communes et modèles, puis
+imprime la question, les données, la référence, les quatre approches, l'analyse par
+bord politique et par stade de l'affaire, la robustesse et la conclusion, avec des
+chiffres recalculés à chaque exécution.
+
+**3. Exécuter les notebooks**
 
 ```bash
 python -m jupyter nbconvert --to notebook --execute --inplace notebooks/0*.ipynb
@@ -112,13 +125,13 @@ python src/affaires.py            # affaires rattachées au panel
 python src/covariables.py         # contexte socio-économique et politique des communes
 ```
 
-**3. Régénérer les figures du README** (après l'étape 2)
+**4. Régénérer les figures du README** (après l'étape 3)
 
 ```bash
 python scripts/figures.py         # docs/figures/*.png, extraites des notebooks exécutés
 ```
 
-**4. Vérifier la reproduction.** Le notebook `00_synthese` doit afficher notamment :
+**5. Vérifier la reproduction.** `main.py` et le notebook `00_synthese` doivent afficher notamment :
 43 729 communes x élection dans le panel, 741 affaires recensées, 75 sortants avec une
 affaire connue au vote (dont 40 révélée pendant le mandat), 6 772 observations dans les
 modèles et, à notoriété égale, un effet de -29,3 points sur la probabilité de victoire
@@ -145,6 +158,7 @@ peuvent alors changer).
 
 | Fichier | Rôle |
 |---|---|
+| `main.py` | point d'entrée : toute la chaîne et un résumé détaillé des résultats |
 | `scripts/download_data.py` | téléchargement reproductible des sources (reprise, contrôles) |
 | `scripts/figures.py` | export des figures du README depuis les notebooks exécutés |
 | `src/load.py` | lecture et nettoyage de chaque source, codes INSEE harmonisés |
@@ -152,7 +166,7 @@ peuvent alors changer).
 | `src/affaires.py` | rattachement des affaires judiciaires aux sortants, variables de traitement, stade de l'affaire au vote |
 | `src/covariables.py` | recensement, revenus, présidentielles : contexte de chaque commune |
 | `src/analyse.py` | comparaisons à taille de commune égale, intervalles bootstrap |
-| `src/modeles.py` | régressions (MCO, logit), appariement sur score de propension |
+| `src/modeles.py` | régressions (MCO, logit), appariement sur score de propension, analyses de synthèse (quatre approches, bord politique, stade de l'affaire, robustesse) |
 | `src/graphiques.py` | charte graphique, carte, graphique des estimations |
 | `notebooks/00_synthese.ipynb` | synthèse : la démarche, les résultats et leurs limites |
 | `notebooks/01_exploration.ipynb` | diagnostic des sources |

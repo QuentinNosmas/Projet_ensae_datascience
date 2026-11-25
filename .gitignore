@@ -232,3 +232,6 @@ data/processed/*
 *.shp
 .ipynb_checkpoints/
 !data/snapshots/*.csv
+
+# Sorties de main.py (figures régénérables)
+sorties/
