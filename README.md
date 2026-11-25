@@ -96,6 +96,23 @@ très larges, faute de cas.*
 - [`notebooks/00_synthese.ipynb`](notebooks/00_synthese.ipynb) : la synthèse, puis le
   détail de chaque étape dans les notebooks 01 à 04.
 
+## Lancer le projet
+
+Avec Python 3.12 :
+
+```bash
+git clone https://github.com/QuentinNosmas/Projet_ensae_datascience.git
+cd Projet_ensae_datascience
+pip install -r requirements.txt
+python main.py
+```
+
+`main.py` télécharge les données publiques manquantes (environ 550 Mo au premier
+lancement), construit toutes les tables et affiche le résumé de l'étude ;
+`python main.py --markdown` régénère `RESULTATS.md`. Les notebooks s'exécutent de la
+même façon, de bout en bout :
+`python -m jupyter nbconvert --to notebook --execute --inplace notebooks/0*.ipynb`.
+
 ## Organisation du dépôt
 
 | Fichier | Rôle |
